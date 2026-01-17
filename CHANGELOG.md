@@ -8,6 +8,7 @@ Docs: https://docs.clawd.bot
 
 ### Fixes
 - Memory: split overly long lines to keep embeddings under token limits.
+- Discord: inherit parent channel allowlists for thread slash commands. (#1122)
 
 ## 2026.1.17-1
 
