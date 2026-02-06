@@ -30,8 +30,11 @@ export function resolveExtraParams(params: {
 }
 
 type CacheRetention = "none" | "short" | "long";
-type CacheRetentionStreamOptions = Partial<SimpleStreamOptions> & {
+type EffortLevel = "low" | "medium" | "high" | "max";
+type ExtendedStreamOptions = Partial<SimpleStreamOptions> & {
   cacheRetention?: CacheRetention;
+  /** Claude Opus 4.6+ effort parameter for adaptive thinking. */
+  effort?: EffortLevel;
 };
 
 /**
@@ -68,6 +71,24 @@ function resolveCacheRetention(
   return undefined;
 }
 
+/**
+ * Resolve effort level from extraParams (Claude Opus 4.6+ only).
+ * Only applies to Anthropic provider.
+ */
+function resolveEffortLevel(
+  extraParams: Record<string, unknown> | undefined,
+  provider: string,
+): EffortLevel | undefined {
+  if (provider !== "anthropic") {
+    return undefined;
+  }
+  const val = extraParams?.effort;
+  if (val === "low" || val === "medium" || val === "high" || val === "max") {
+    return val;
+  }
+  return undefined;
+}
+
 function createStreamFnWithExtraParams(
   baseStreamFn: StreamFn | undefined,
   extraParams: Record<string, unknown> | undefined,
@@ -77,7 +98,7 @@ function createStreamFnWithExtraParams(
     return undefined;
   }
 
-  const streamParams: CacheRetentionStreamOptions = {};
+  const streamParams: ExtendedStreamOptions = {};
   if (typeof extraParams.temperature === "number") {
     streamParams.temperature = extraParams.temperature;
   }
@@ -87,6 +108,10 @@ function createStreamFnWithExtraParams(
   const cacheRetention = resolveCacheRetention(extraParams, provider);
   if (cacheRetention) {
     streamParams.cacheRetention = cacheRetention;
+  }
+  const effort = resolveEffortLevel(extraParams, provider);
+  if (effort) {
+    streamParams.effort = effort;
   }
 
   if (Object.keys(streamParams).length === 0) {
