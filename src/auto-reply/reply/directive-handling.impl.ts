@@ -2,7 +2,14 @@ import type { OpenClawConfig } from "../../config/config.js";
 import type { ExecAsk, ExecHost, ExecSecurity } from "../../infra/exec-approvals.js";
 import type { ReplyPayload } from "../types.js";
 import type { HandleDirectiveOnlyParams } from "./directive-handling.params.js";
-import type { ElevatedLevel, ReasoningLevel, ThinkLevel } from "./directives.js";
+import type { InlineDirectives } from "./directive-handling.parse.js";
+import type {
+  EffortLevel,
+  ElevatedLevel,
+  ReasoningLevel,
+  ThinkLevel,
+  VerboseLevel,
+} from "./directives.js";
 import {
   resolveAgentConfig,
   resolveAgentDir,
@@ -13,7 +20,12 @@ import { type SessionEntry, updateSessionStore } from "../../config/sessions.js"
 import { enqueueSystemEvent } from "../../infra/system-events.js";
 import { applyVerboseOverride } from "../../sessions/level-overrides.js";
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
-import { formatThinkingLevels, formatXHighModelHint, supportsXHighThinking } from "../thinking.js";
+import {
+  formatEffortLevels,
+  formatThinkingLevels,
+  formatXHighModelHint,
+  supportsXHighThinking,
+} from "../thinking.js";
 import {
   maybeHandleModelDirectiveInfo,
   resolveModelSelectionFromDirective,
@@ -56,9 +68,42 @@ function resolveExecDefaults(params: {
   };
 }
 
+<<<<<<< HEAD
 export async function handleDirectiveOnly(
   params: HandleDirectiveOnlyParams,
 ): Promise<ReplyPayload | undefined> {
+=======
+export async function handleDirectiveOnly(params: {
+  cfg: OpenClawConfig;
+  directives: InlineDirectives;
+  sessionEntry: SessionEntry;
+  sessionStore: Record<string, SessionEntry>;
+  sessionKey: string;
+  storePath?: string;
+  elevatedEnabled: boolean;
+  elevatedAllowed: boolean;
+  elevatedFailures?: Array<{ gate: string; key: string }>;
+  messageProviderKey?: string;
+  defaultProvider: string;
+  defaultModel: string;
+  aliasIndex: ModelAliasIndex;
+  allowedModelKeys: Set<string>;
+  allowedModelCatalog: Awaited<
+    ReturnType<typeof import("../../agents/model-catalog.js").loadModelCatalog>
+  >;
+  resetModelOverride: boolean;
+  provider: string;
+  model: string;
+  initialModelLabel: string;
+  formatModelSwitchEvent: (label: string, alias?: string) => string;
+  currentThinkLevel?: ThinkLevel;
+  currentVerboseLevel?: VerboseLevel;
+  currentReasoningLevel?: ReasoningLevel;
+  currentEffortLevel?: EffortLevel;
+  currentElevatedLevel?: ElevatedLevel;
+  surface?: string;
+}): Promise<ReplyPayload | undefined> {
+>>>>>>> 6b6ba3f52 (feat: add /effort command for Claude adaptive thinking depth)
   const {
     directives,
     sessionEntry,
@@ -80,6 +125,7 @@ export async function handleDirectiveOnly(
     currentThinkLevel,
     currentVerboseLevel,
     currentReasoningLevel,
+    currentEffortLevel,
     currentElevatedLevel,
   } = params;
   const activeAgentId = resolveSessionAgentId({
@@ -166,6 +212,17 @@ export async function handleDirectiveOnly(
     }
     return {
       text: `Unrecognized reasoning level "${directives.rawReasoningLevel}". Valid levels: on, off, stream.`,
+    };
+  }
+  if (directives.hasEffortDirective && !directives.effortLevel) {
+    if (!directives.rawEffortLevel) {
+      const level = currentEffortLevel ?? "high";
+      return {
+        text: withOptions(`Current effort level: ${level}.`, formatEffortLevels()),
+      };
+    }
+    return {
+      text: `Unrecognized effort level "${directives.rawEffortLevel}". Valid levels: ${formatEffortLevels()}.`,
     };
   }
   if (directives.hasElevatedDirective && !directives.elevatedLevel) {
@@ -298,6 +355,14 @@ export async function handleDirectiveOnly(
     reasoningChanged =
       directives.reasoningLevel !== prevReasoningLevel && directives.reasoningLevel !== undefined;
   }
+  if (directives.hasEffortDirective && directives.effortLevel) {
+    if (directives.effortLevel === "high") {
+      // "high" is the default, so we can delete it
+      delete sessionEntry.effortLevel;
+    } else {
+      sessionEntry.effortLevel = directives.effortLevel;
+    }
+  }
   if (directives.hasElevatedDirective && directives.elevatedLevel) {
     // Unlike other toggles, elevated defaults can be "on".
     // Persist "off" explicitly so `/elevated off` actually overrides defaults.
@@ -394,6 +459,13 @@ export async function handleDirectiveOnly(
         : directives.reasoningLevel === "stream"
           ? formatDirectiveAck("Reasoning stream enabled (Telegram only).")
           : formatDirectiveAck("Reasoning visibility enabled."),
+    );
+  }
+  if (directives.hasEffortDirective && directives.effortLevel) {
+    parts.push(
+      directives.effortLevel === "high"
+        ? formatDirectiveAck("Effort level reset to default (high).")
+        : `Effort level set to ${directives.effortLevel} (Claude adaptive thinking).`,
     );
   }
   if (directives.hasElevatedDirective && directives.elevatedLevel) {
