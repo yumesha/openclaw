@@ -6,7 +6,7 @@ import type {
 import { listChannelDocks } from "../channels/dock.js";
 import { getActivePluginRegistry } from "../plugins/runtime.js";
 import { COMMAND_ARG_FORMATTERS } from "./commands-args.js";
-import { listThinkingLevels } from "./thinking.js";
+import { listEffortLevels, listThinkingLevels } from "./thinking.js";
 
 type DefineChatCommandInput = {
   key: string;
@@ -466,6 +466,22 @@ function buildChatCommands(): ChatCommandDefinition[] {
           description: "on, off, or stream",
           type: "string",
           choices: ["on", "off", "stream"],
+        },
+      ],
+      argsMenu: "auto",
+    }),
+    defineChatCommand({
+      key: "effort",
+      nativeName: "effort",
+      description: "Set Claude effort level (adaptive thinking depth).",
+      textAlias: "/effort",
+      category: "options",
+      args: [
+        {
+          name: "level",
+          description: "low, medium, high, max",
+          type: "string",
+          choices: listEffortLevels(),
         },
       ],
       argsMenu: "auto",
