@@ -91,7 +91,12 @@ async function refreshOAuthTokenWithLock(params: {
 
     // Bidirectional sync: write refreshed credentials back to Claude CLI storage
     // This ensures Claude Code continues to work after OpenClaw refreshes the token
-    if (params.profileId === CLAUDE_CLI_PROFILE_ID && cred.provider === "anthropic") {
+    // Skip on VPS/headless where bot users shouldn't have ~/.claude (set OPENCLAW_SKIP_CLAUDE_CLI_SYNC=1)
+    if (
+      params.profileId === CLAUDE_CLI_PROFILE_ID &&
+      cred.provider === "anthropic" &&
+      !process.env.OPENCLAW_SKIP_CLAUDE_CLI_SYNC
+    ) {
       writeClaudeCliCredentials(result.newCredentials);
     }
 
