@@ -362,12 +362,12 @@ export function loadAuthProfileStore(): AuthProfileStore {
       profiles: {},
     };
     applyLegacyStore(store, legacy);
-    syncExternalCliCredentials(store);
+    syncExternalCliCredentials(store, { allowKeychainPrompt: false });
     return store;
   }
 
   const store: AuthProfileStore = { version: AUTH_STORE_VERSION, profiles: {} };
-  syncExternalCliCredentials(store);
+  syncExternalCliCredentials(store, { allowKeychainPrompt: false });
   return store;
 }
 
