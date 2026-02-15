@@ -1,4 +1,6 @@
 import type { AuthProfileStore } from "../agents/auth-profiles.js";
+import { CLAUDE_CLI_PROFILE_ID } from "../agents/auth-profiles.js";
+import { colorize, isRich, theme } from "../terminal/theme.js";
 import { AUTH_CHOICE_LEGACY_ALIASES_FOR_CLI } from "./auth-choice-legacy.js";
 import { ONBOARD_PROVIDER_AUTH_FLAGS } from "./onboard-provider-auth-flags.js";
 import type { AuthChoice, AuthChoiceGroupId } from "./onboard-types.js";
@@ -32,8 +34,8 @@ const AUTH_CHOICE_GROUP_DEFS: {
   {
     value: "anthropic",
     label: "Anthropic",
-    hint: "setup-token + API key",
-    choices: ["token", "apiKey"],
+    hint: "Claude Code CLI + API key",
+    choices: ["token", "claude-cli", "apiKey"],
   },
   {
     value: "chutes",
@@ -300,6 +302,33 @@ const BASE_AUTH_CHOICE_OPTIONS: ReadonlyArray<AuthChoiceOption> = [
   { value: "custom-api-key", label: "Custom Provider" },
 ];
 
+function formatOAuthHint(expires?: number, opts?: { allowStale?: boolean }): string {
+  const rich = isRich();
+  if (!expires) {
+    return colorize(rich, theme.muted, "token unavailable");
+  }
+  const now = Date.now();
+  const remaining = expires - now;
+  if (remaining <= 0) {
+    if (opts?.allowStale) {
+      return colorize(rich, theme.warn, "token present · refresh on use");
+    }
+    return colorize(rich, theme.error, "token expired");
+  }
+  const minutes = Math.round(remaining / (60 * 1000));
+  const duration =
+    minutes >= 120
+      ? `${Math.round(minutes / 60)}h`
+      : minutes >= 60
+        ? "1h"
+        : `${Math.max(minutes, 1)}m`;
+  const label = `token ok · expires in ${duration}`;
+  if (minutes <= 10) {
+    return colorize(rich, theme.warn, label);
+  }
+  return colorize(rich, theme.success, label);
+}
+
 export function formatAuthChoiceChoicesForCli(params?: {
   includeSkip?: boolean;
   includeLegacyAliases?: boolean;
@@ -321,9 +350,29 @@ export function formatAuthChoiceChoicesForCli(params?: {
 export function buildAuthChoiceOptions(params: {
   store: AuthProfileStore;
   includeSkip: boolean;
+  includeClaudeCliIfMissing?: boolean;
+  platform?: NodeJS.Platform;
 }): AuthChoiceOption[] {
-  void params.store;
-  const options: AuthChoiceOption[] = [...BASE_AUTH_CHOICE_OPTIONS];
+  const platform = params.platform ?? process.platform;
+  const options: AuthChoiceOption[] = [];
+
+  // Add Claude CLI option if credentials exist or explicitly requested
+  const claudeCli = params.store.profiles[CLAUDE_CLI_PROFILE_ID];
+  if (claudeCli?.type === "oauth" || claudeCli?.type === "token") {
+    options.push({
+      value: "claude-cli",
+      label: "Anthropic token (Claude Code CLI)",
+      hint: `reuses existing Claude Code auth · ${formatOAuthHint(claudeCli.expires, { allowStale: true })}`,
+    });
+  } else if (params.includeClaudeCliIfMissing && platform === "darwin") {
+    options.push({
+      value: "claude-cli",
+      label: "Anthropic token (Claude Code CLI)",
+      hint: "reuses existing Claude Code auth · requires Keychain access",
+    });
+  }
+
+  options.push(...BASE_AUTH_CHOICE_OPTIONS);
 
   if (params.includeSkip) {
     options.push({ value: "skip", label: "Skip for now" });
@@ -332,7 +381,12 @@ export function buildAuthChoiceOptions(params: {
   return options;
 }
 
-export function buildAuthChoiceGroups(params: { store: AuthProfileStore; includeSkip: boolean }): {
+export function buildAuthChoiceGroups(params: {
+  store: AuthProfileStore;
+  includeSkip: boolean;
+  includeClaudeCliIfMissing?: boolean;
+  platform?: NodeJS.Platform;
+}): {
   groups: AuthChoiceGroup[];
   skipOption?: AuthChoiceOption;
 } {
