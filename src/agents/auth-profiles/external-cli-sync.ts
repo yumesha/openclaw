@@ -194,10 +194,15 @@ function syncExternalCliCredentialsForProvider(
 
 /**
  * Sync OAuth credentials from external CLI tools (Claude CLI, Qwen Code CLI, MiniMax CLI) into the store.
+ * This allows OpenClaw to use the same credentials as these tools without requiring
+ * separate authentication, and keeps credentials in sync when CLI tools refresh tokens.
  *
  * Returns true if any credentials were updated.
  */
-export function syncExternalCliCredentials(store: AuthProfileStore): boolean {
+export function syncExternalCliCredentials(
+  store: AuthProfileStore,
+  options?: { allowKeychainPrompt?: boolean },
+): boolean {
   let mutated = false;
   const now = Date.now();
 
@@ -206,9 +211,13 @@ export function syncExternalCliCredentials(store: AuthProfileStore): boolean {
   const shouldSyncClaude =
     !existingClaude ||
     existingClaude.provider !== "anthropic" ||
+    existingClaude.type === "token" ||
     !isExternalProfileFresh(existingClaude, now);
   const claudeCreds = shouldSyncClaude
-    ? readClaudeCliCredentialsCached({ ttlMs: EXTERNAL_CLI_SYNC_TTL_MS })
+    ? readClaudeCliCredentialsCached({
+        allowKeychainPrompt: options?.allowKeychainPrompt,
+        ttlMs: EXTERNAL_CLI_SYNC_TTL_MS,
+      })
     : null;
   if (claudeCreds && syncClaudeCliCredentials(store, claudeCreds, now)) {
     mutated = true;
