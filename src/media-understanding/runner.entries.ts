@@ -470,13 +470,20 @@ export async function runProviderEntry(params: {
   });
   const apiKey = requireApiKey(auth, providerId);
   const providerConfig = cfg.models?.providers?.[providerId];
+  const baseUrl = entry.baseUrl ?? params.config?.baseUrl ?? providerConfig?.baseUrl;
+  const mergedHeaders = {
+    ...providerConfig?.headers,
+    ...params.config?.headers,
+    ...entry.headers,
+  };
+  const headers = Object.keys(mergedHeaders).length > 0 ? mergedHeaders : undefined;
   const result = await provider.describeVideo({
     buffer: media.buffer,
     fileName: media.fileName,
     mime: media.mime,
     apiKey,
-    baseUrl: providerConfig?.baseUrl,
-    headers: providerConfig?.headers,
+    baseUrl,
+    headers,
     model: entry.model,
     prompt,
     timeoutMs,
