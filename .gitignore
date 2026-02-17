@@ -86,3 +86,16 @@ USER.md
 !.agent/workflows/
 /local/
 package-lock.json
+
+# Local directories
+.claude
+bad.json
+.envrc
+session_summary.md
+shell.nix
+.direnv
+UPSTREAM_WITH_MY_LATEST_COMMIT.md
+OPENCLAW_PACKAGE_AUTO_FIX.md
+hellsec/
+vps-clawbot/
+nix-openclaw/
