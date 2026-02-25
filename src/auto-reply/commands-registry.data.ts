@@ -395,6 +395,20 @@ function buildChatCommands(): ChatCommandDefinition[] {
       category: "tools",
     }),
     defineChatCommand({
+      key: "startbot",
+      nativeName: "startbot",
+      description: "Start the OpenClaw systemd service.",
+      textAlias: "/startbot",
+      category: "management",
+    }),
+    defineChatCommand({
+      key: "stopbot",
+      nativeName: "stopbot",
+      description: "Stop the OpenClaw systemd service.",
+      textAlias: "/stopbot",
+      category: "management",
+    }),
+    defineChatCommand({
       key: "activation",
       nativeName: "activation",
       description: "Set group activation mode.",

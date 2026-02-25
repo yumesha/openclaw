@@ -5,6 +5,7 @@ import { updateSessionStore } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
 import { scheduleGatewaySigusr1Restart, triggerOpenClawRestart } from "../../infra/restart.js";
+import { startOpenClawService, stopOpenClawService } from "../../infra/service-control.js";
 import { loadCostUsageSummary, loadSessionCostSummary } from "../../infra/session-cost-usage.js";
 import { formatTokenCount, formatUsd } from "../../utils/usage-format.js";
 import { parseActivationCommand } from "../group-activation.js";
@@ -383,4 +384,76 @@ export const handleAbortTrigger: CommandHandler = async (params, allowTextComman
     abortKey: params.command.abortKey,
   });
   return { shouldContinue: false, reply: { text: "⚙️ Agent was aborted." } };
+};
+
+/**
+ * Handle /startbot command - Start the OpenClaw systemd service
+ */
+export const handleStartBotCommand: CommandHandler = async (params, allowTextCommands) => {
+  if (!allowTextCommands) {
+    return null;
+  }
+  if (params.command.commandBodyNormalized !== "/startbot") {
+    return null;
+  }
+  if (!params.command.isAuthorizedSender) {
+    logVerbose(
+      `Ignoring /startbot from unauthorized sender: ${params.command.senderId || "<unknown>"}`,
+    );
+    return { shouldContinue: false };
+  }
+
+  const result = startOpenClawService();
+
+  if (result.ok) {
+    return {
+      shouldContinue: false,
+      reply: {
+        text: `▶️ OpenClaw service started successfully.`,
+      },
+    };
+  }
+
+  return {
+    shouldContinue: false,
+    reply: {
+      text: `⚠️ Failed to start OpenClaw service: ${result.detail || "Unknown error"}`,
+    },
+  };
+};
+
+/**
+ * Handle /stopbot command - Stop the OpenClaw systemd service
+ */
+export const handleStopBotCommand: CommandHandler = async (params, allowTextCommands) => {
+  if (!allowTextCommands) {
+    return null;
+  }
+  if (params.command.commandBodyNormalized !== "/stopbot") {
+    return null;
+  }
+  if (!params.command.isAuthorizedSender) {
+    logVerbose(
+      `Ignoring /stopbot from unauthorized sender: ${params.command.senderId || "<unknown>"}`,
+    );
+    return { shouldContinue: false };
+  }
+
+  const result = stopOpenClawService();
+
+  if (result.ok) {
+    return {
+      shouldContinue: false,
+      reply: {
+        text: `⏹️ OpenClaw service stopped successfully.\n\nNote: You won't be able to send further commands until the service is restarted (use /startbot or systemctl).`,
+      },
+    };
+  }
+
+  return {
+    shouldContinue: false,
+    reply: {
+      text: `⚠️ Failed to stop OpenClaw service: ${result.detail || "Unknown error"}`,
+    },
+  };
 };
