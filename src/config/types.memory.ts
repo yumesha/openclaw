@@ -3,6 +3,7 @@ import type { SessionSendPolicyConfig } from "./types.base.js";
 export type MemoryBackend = "builtin" | "qmd";
 export type MemoryCitationsMode = "auto" | "on" | "off";
 export type MemoryQmdSearchMode = "query" | "search" | "vsearch";
+export type QmdEmbeddingProvider = "local" | "openai" | "gemini" | "voyage";
 
 export type MemoryConfig = {
   backend?: MemoryBackend;
@@ -20,6 +21,39 @@ export type MemoryQmdConfig = {
   update?: MemoryQmdUpdateConfig;
   limits?: MemoryQmdLimitsConfig;
   scope?: SessionSendPolicyConfig;
+  embeddings?: QmdEmbeddingsConfig;
+};
+
+export type QmdEmbeddingsConfig = {
+  provider?: QmdEmbeddingProvider;
+  local?: QmdLocalEmbeddingConfig;
+  openai?: QmdOpenAIEmbeddingConfig;
+  gemini?: QmdGeminiEmbeddingConfig;
+  voyage?: QmdVoyageEmbeddingConfig;
+};
+
+export type QmdLocalEmbeddingConfig = {
+  modelPath?: string;
+};
+
+export type QmdOpenAIEmbeddingConfig = {
+  apiKey?: string;
+  model?: string;
+  baseUrl?: string;
+  batchSize?: number;
+  dimensions?: number;
+};
+
+export type QmdGeminiEmbeddingConfig = {
+  apiKey?: string;
+  model?: string;
+  batchSize?: number;
+};
+
+export type QmdVoyageEmbeddingConfig = {
+  apiKey?: string;
+  model?: string;
+  batchSize?: number;
 };
 
 export type MemoryQmdMcporterConfig = {

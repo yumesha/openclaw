@@ -143,4 +143,133 @@ describe("resolveMemoryBackendConfig", () => {
     const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
     expect(resolved.qmd?.searchMode).toBe("vsearch");
   });
+
+  it("defaults to local embedding provider", () => {
+    const cfg = {
+      agents: { defaults: { workspace: "/tmp/memory-test" } },
+      memory: {
+        backend: "qmd",
+        qmd: {},
+      },
+    } as OpenClawConfig;
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
+    expect(resolved.qmd?.embeddings.provider).toBe("local");
+    expect(resolved.qmd?.embeddings.local).toBeDefined();
+  });
+
+  it("resolves OpenAI embedding configuration", () => {
+    const cfg: OpenClawConfig = {
+      agents: { defaults: { workspace: "/tmp/memory-test" } },
+      memory: {
+        backend: "qmd",
+        qmd: {
+          embeddings: {
+            provider: "openai",
+            openai: {
+              apiKey: "sk-test-key",
+              model: "text-embedding-3-large",
+              baseUrl: "https://custom.openai.com/v1",
+              batchSize: 50,
+              dimensions: 3072,
+            },
+          },
+        },
+      },
+    };
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
+    expect(resolved.qmd?.embeddings.provider).toBe("openai");
+    expect(resolved.qmd?.embeddings.openai?.model).toBe("text-embedding-3-large");
+    expect(resolved.qmd?.embeddings.openai?.baseUrl).toBe("https://custom.openai.com/v1");
+    expect(resolved.qmd?.embeddings.openai?.batchSize).toBe(50);
+    expect(resolved.qmd?.embeddings.openai?.dimensions).toBe(3072);
+    expect(resolved.qmd?.embeddings.openai?.apiKey).toBe("sk-test-key");
+  });
+
+  it("resolves Gemini embedding configuration", () => {
+    const cfg: OpenClawConfig = {
+      agents: { defaults: { workspace: "/tmp/memory-test" } },
+      memory: {
+        backend: "qmd",
+        qmd: {
+          embeddings: {
+            provider: "gemini",
+            gemini: {
+              apiKey: "gemini-test-key",
+              model: "gemini-embedding-001",
+              batchSize: 64,
+            },
+          },
+        },
+      },
+    };
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
+    expect(resolved.qmd?.embeddings.provider).toBe("gemini");
+    expect(resolved.qmd?.embeddings.gemini?.model).toBe("gemini-embedding-001");
+    expect(resolved.qmd?.embeddings.gemini?.batchSize).toBe(64);
+    expect(resolved.qmd?.embeddings.gemini?.apiKey).toBe("gemini-test-key");
+  });
+
+  it("resolves Voyage embedding configuration", () => {
+    const cfg: OpenClawConfig = {
+      agents: { defaults: { workspace: "/tmp/memory-test" } },
+      memory: {
+        backend: "qmd",
+        qmd: {
+          embeddings: {
+            provider: "voyage",
+            voyage: {
+              apiKey: "voyage-test-key",
+              model: "voyage-3-lite",
+              batchSize: 256,
+            },
+          },
+        },
+      },
+    };
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
+    expect(resolved.qmd?.embeddings.provider).toBe("voyage");
+    expect(resolved.qmd?.embeddings.voyage?.model).toBe("voyage-3-lite");
+    expect(resolved.qmd?.embeddings.voyage?.batchSize).toBe(256);
+    expect(resolved.qmd?.embeddings.voyage?.apiKey).toBe("voyage-test-key");
+  });
+
+  it("uses default values for OpenAI when not specified", () => {
+    const cfg: OpenClawConfig = {
+      agents: { defaults: { workspace: "/tmp/memory-test" } },
+      memory: {
+        backend: "qmd",
+        qmd: {
+          embeddings: {
+            provider: "openai",
+          },
+        },
+      },
+    };
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
+    expect(resolved.qmd?.embeddings.provider).toBe("openai");
+    expect(resolved.qmd?.embeddings.openai?.model).toBe("text-embedding-3-small");
+    expect(resolved.qmd?.embeddings.openai?.baseUrl).toBe("https://api.openai.com/v1");
+    expect(resolved.qmd?.embeddings.openai?.batchSize).toBe(100);
+  });
+
+  it("resolves API key from environment variable reference", () => {
+    process.env.TEST_OPENAI_KEY = "from-env-var";
+    const cfg: OpenClawConfig = {
+      agents: { defaults: { workspace: "/tmp/memory-test" } },
+      memory: {
+        backend: "qmd",
+        qmd: {
+          embeddings: {
+            provider: "openai",
+            openai: {
+              apiKey: "$TEST_OPENAI_KEY",
+            },
+          },
+        },
+      },
+    };
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId: "main" });
+    expect(resolved.qmd?.embeddings.openai?.apiKey).toBe("from-env-var");
+    delete process.env.TEST_OPENAI_KEY;
+  });
 });
