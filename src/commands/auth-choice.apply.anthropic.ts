@@ -3,6 +3,7 @@ import {
   ensureAuthProfileStore,
   upsertAuthProfile,
 } from "../agents/auth-profiles.js";
+import { normalizeApiKeyInput, validateApiKeyInput } from "./auth-choice.api-key.js";
 import {
   normalizeSecretInputModeInput,
   ensureApiKeyFromOptionEnvOrPrompt,
