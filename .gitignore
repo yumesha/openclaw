@@ -96,6 +96,13 @@ USER.md
 /local/
 package-lock.json
 .claude/
+
+# direnv
+.direnv/
+
+# Private files
+.a_private/
+
 .agents/
 .agents
 .agent/
