@@ -42,6 +42,7 @@ export type HandleDirectiveOnlyParams = HandleDirectiveOnlyCoreParams & {
   currentReasoningLevel?: ReasoningLevel;
   currentEffortLevel?: EffortLevel;
   currentElevatedLevel?: ElevatedLevel;
+  effortDefault?: EffortLevel;
   surface?: string;
 };
 

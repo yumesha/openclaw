@@ -1,7 +1,7 @@
 import type { StreamFn } from "@mariozechner/pi-agent-core";
 import type { SimpleStreamOptions } from "@mariozechner/pi-ai";
 import { streamSimple } from "@mariozechner/pi-ai";
-import type { ThinkLevel } from "../../auto-reply/thinking.js";
+import type { EffortLevel, ThinkLevel } from "../../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { log } from "./logger.js";
 
@@ -44,7 +44,6 @@ export function resolveExtraParams(params: {
 }
 
 type CacheRetention = "none" | "short" | "long";
-type EffortLevel = "low" | "medium" | "high" | "max";
 type AdaptiveThinking = { type: "adaptive" };
 type ExtendedStreamOptions = Partial<SimpleStreamOptions> & {
   cacheRetention?: CacheRetention;

@@ -14,6 +14,7 @@ import {
   formatEffortLevels,
   formatThinkingLevels,
   formatXHighModelHint,
+  supportsEffort,
   supportsXHighThinking,
 } from "../thinking.js";
 import type { ReplyPayload } from "../types.js";
@@ -87,6 +88,7 @@ export async function handleDirectiveOnly(
     currentReasoningLevel,
     currentEffortLevel,
     currentElevatedLevel,
+    effortDefault,
   } = params;
   const activeAgentId = resolveSessionAgentId({
     sessionKey: params.sessionKey,
@@ -177,7 +179,13 @@ export async function handleDirectiveOnly(
   }
   if (directives.hasEffortDirective && !directives.effortLevel) {
     if (!directives.rawEffortLevel) {
-      const level = currentEffortLevel ?? "high";
+      if (!supportsEffort(provider, model)) {
+        return {
+          text: `Effort level is only available for Claude Opus 4.5+ models with adaptive thinking.`,
+        };
+      }
+      const resolvedDefault = effortDefault ?? "high";
+      const level = currentEffortLevel ?? resolvedDefault;
       return {
         text: withOptions(`Current effort level: ${level}.`, formatEffortLevels()),
       };
@@ -318,8 +326,9 @@ export async function handleDirectiveOnly(
       directives.reasoningLevel !== prevReasoningLevel && directives.reasoningLevel !== undefined;
   }
   if (directives.hasEffortDirective && directives.effortLevel) {
-    if (directives.effortLevel === "high") {
-      // "high" is the default, so we can delete it
+    const resolvedDefault = effortDefault ?? "high";
+    if (directives.effortLevel === resolvedDefault) {
+      // Matches configured default, so we can delete it from session
       delete sessionEntry.effortLevel;
     } else {
       sessionEntry.effortLevel = directives.effortLevel;
@@ -424,11 +433,20 @@ export async function handleDirectiveOnly(
     );
   }
   if (directives.hasEffortDirective && directives.effortLevel) {
-    parts.push(
-      directives.effortLevel === "high"
-        ? formatDirectiveAck("Effort level reset to default (high).")
-        : `Effort level set to ${directives.effortLevel} (Claude adaptive thinking).`,
-    );
+    if (!supportsEffort(provider, model)) {
+      parts.push(
+        formatDirectiveAck(
+          `Effort level is only available for Claude Opus 4.5+ models. Current model: ${provider}/${model}.`,
+        ),
+      );
+    } else {
+      const resolvedDefault = effortDefault ?? "high";
+      parts.push(
+        directives.effortLevel === resolvedDefault
+          ? formatDirectiveAck(`Effort level reset to default (${resolvedDefault}).`)
+          : `Effort level set to ${directives.effortLevel} (Claude adaptive thinking).`,
+      );
+    }
   }
   if (directives.hasElevatedDirective && directives.elevatedLevel) {
     parts.push(
