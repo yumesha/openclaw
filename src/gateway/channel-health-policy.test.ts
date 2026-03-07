@@ -222,26 +222,6 @@ describe("evaluateChannelHealth", () => {
     );
     expect(evaluation).toEqual({ healthy: true, reason: "healthy" });
   });
-
-  it("flags inherited event timestamps after the lifecycle exceeds the stale threshold", () => {
-    const evaluation = evaluateChannelHealth(
-      {
-        running: true,
-        connected: true,
-        enabled: true,
-        configured: true,
-        lastStartAt: 50_000,
-        lastEventAt: 10_000,
-      },
-      {
-        channelId: "slack",
-        now: 140_000,
-        channelConnectGraceMs: 10_000,
-        staleEventThresholdMs: 30_000,
-      },
-    );
-    expect(evaluation).toEqual({ healthy: false, reason: "stale-socket" });
-  });
 });
 
 describe("resolveChannelRestartReason", () => {

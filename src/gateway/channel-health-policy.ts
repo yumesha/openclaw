@@ -117,11 +117,8 @@ export function evaluateChannelHealth(
     snapshot.lastEventAt != null
   ) {
     if (lastStartAt != null && snapshot.lastEventAt < lastStartAt) {
-      const lifecycleEventGap = Math.max(0, policy.now - lastStartAt);
-      if (lifecycleEventGap <= policy.staleEventThresholdMs) {
-        return { healthy: true, reason: "healthy" };
-      }
-      return { healthy: false, reason: "stale-socket" };
+      // No events received since channel started - don't flag as stale yet
+      return { healthy: true, reason: "healthy" };
     }
     const eventAge = policy.now - snapshot.lastEventAt;
     if (eventAge > policy.staleEventThresholdMs) {
