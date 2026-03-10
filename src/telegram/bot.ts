@@ -64,8 +64,6 @@ export type TelegramBotOptions = {
     mediaGroupFlushMs?: number;
     textFragmentGapMs?: number;
   };
-  /** AbortSignal to abort in-flight fetches (e.g., on shutdown). */
-  fetchAbortSignal?: AbortSignal;
 };
 
 export { getTelegramSequentialKey };
@@ -154,22 +152,7 @@ export function createTelegramBot(opts: TelegramBotOptions) {
     typeof telegramCfg?.timeoutSeconds === "number" && Number.isFinite(telegramCfg.timeoutSeconds)
       ? Math.max(1, Math.floor(telegramCfg.timeoutSeconds))
       : undefined;
-  // Wrap fetch with an AbortSignal so that in-flight requests
-  // (especially long-polling getUpdates) aborts immediately on shutdown. Without this,
-  // the in-flight getUpdates hangs for up to 30s, and a new gateway instance starting
-  // its own poll triggers a 409 Conflict from Telegram.
-  let finalFetch = shouldProvideFetch && fetchImpl ? fetchForClient : undefined;
-  if (opts.fetchAbortSignal) {
-    const baseFetch =
-      finalFetch ?? (globalThis.fetch as unknown as NonNullable<ApiClientOptions["fetch"]>);
-    finalFetch = (input, init) =>
-      baseFetch(input, {
-        ...init,
-        signal: init?.signal
-          ? AbortSignal.any([init.signal, opts.fetchAbortSignal!])
-          : opts.fetchAbortSignal!,
-      });
-  }
+
   const client: ApiClientOptions | undefined =
     shouldProvideFetch || timeoutSeconds || finalFetch
       ? {
