@@ -857,13 +857,23 @@ function normalizeKimiCodingToolDefinition(tool: unknown): Record<string, unknow
   }
 
   const toolObj = tool as Record<string, unknown>;
+
+  // If already in OpenAI format, validate it has required fields
   if (toolObj.function && typeof toolObj.function === "object") {
-    return toolObj;
+    const fn = toolObj.function as Record<string, unknown>;
+    if (typeof fn.name !== "string" || !fn.name.trim()) {
+      return undefined; // Invalid function without name
+    }
+    // Ensure type is set and return normalized structure
+    return {
+      type: "function",
+      function: fn,
+    };
   }
 
   const rawName = typeof toolObj.name === "string" ? toolObj.name.trim() : "";
   if (!rawName) {
-    return toolObj;
+    return undefined; // Filter out tools without names
   }
 
   const functionSpec: Record<string, unknown> = {
