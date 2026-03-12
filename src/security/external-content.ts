@@ -299,6 +299,44 @@ export function buildSafeExternalPrompt(params: {
 }
 
 /**
+ * Extracts the clean content from within external content wrapper markers.
+ * Returns the original content if no markers are found.
+ */
+export function extractExternalContent(text: string): string {
+  // Match content between EXTERNAL_UNTRUSTED_CONTENT and END_EXTERNAL_UNTRUSTED_CONTENT
+  // Handles both old format (without id) and new format (with id)
+  const startMatch = text.match(/<<<EXTERNAL_UNTRUSTED_CONTENT(?:\s+id="[^"]{1,128}")?\s*>>>/);
+  if (!startMatch) {
+    return text;
+  }
+  
+  const startIndex = startMatch.index! + startMatch[0].length;
+  
+  // Find the end marker
+  const endMatch = text.match(/<<<END_EXTERNAL_UNTRUSTED_CONTENT(?:\s+id="[^"]{1,128}")?\s*>>>/);
+  if (!endMatch || endMatch.index === undefined || endMatch.index < startIndex) {
+    return text;
+  }
+  
+  // Extract content between markers (skipping the metadata line and --- separator)
+  const wrappedContent = text.slice(startIndex, endMatch.index);
+  
+  // Skip past the metadata section (Source: XXX and optional From/Subject lines, then ---)
+  const lines = wrappedContent.split('\n');
+  let contentStart = 0;
+  
+  // Skip metadata lines until we hit the --- separator
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === '---') {
+      contentStart = i + 1;
+      break;
+    }
+  }
+  
+  return lines.slice(contentStart).join('\n').trim();
+}
+
+/**
  * Checks if a session key indicates an external hook source.
  */
 export function isExternalHookSession(sessionKey: string): boolean {

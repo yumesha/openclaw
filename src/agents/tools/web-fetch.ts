@@ -2,7 +2,7 @@ import { Type } from "@sinclair/typebox";
 import type { OpenClawConfig } from "../../config/config.js";
 import { SsrFBlockedError } from "../../infra/net/ssrf.js";
 import { logDebug } from "../../logger.js";
-import { wrapExternalContent, wrapWebContent } from "../../security/external-content.js";
+import { extractExternalContent, wrapExternalContent, wrapWebContent } from "../../security/external-content.js";
 import { normalizeSecretInput } from "../../utils/normalize-secret-input.js";
 import { stringEnum } from "../schema/typebox.js";
 import type { AnyAgentTool } from "./common.js";
@@ -646,6 +646,10 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
     const wrapped = wrapWebFetchContent(text, params.maxChars);
     const wrappedTitle = title ? wrapWebFetchField(title) : undefined;
     const wrappedWarning = wrapWebFetchField(responseTruncatedWarning);
+    
+    // Extract clean content (without security wrapper) for easier model consumption
+    const cleanText = extractExternalContent(wrapped.text);
+    
     const payload = {
       url: params.url, // Keep raw for tool chaining
       finalUrl, // Keep raw
@@ -666,6 +670,7 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
       fetchedAt: new Date().toISOString(),
       tookMs: Date.now() - start,
       text: wrapped.text,
+      cleanText, // Clean content without security wrapper for model use
       warning: wrappedWarning,
     };
     writeCache(FETCH_CACHE, cacheKey, payload, params.cacheTtlMs);
