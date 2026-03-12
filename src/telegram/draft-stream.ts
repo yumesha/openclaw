@@ -183,6 +183,10 @@ export function createTelegramDraftStream(params: {
     sendGeneration,
   }: PreviewSendParams): Promise<boolean> => {
     if (typeof streamMessageId === "number") {
+      // Skip edit if content hasn't changed to avoid "message is not modified" error
+      if (renderedText === lastSentText && renderedParseMode === lastSentParseMode) {
+        return true;
+      }
       if (renderedParseMode) {
         await params.api.editMessageText(chatId, streamMessageId, renderedText, {
           parse_mode: renderedParseMode,
