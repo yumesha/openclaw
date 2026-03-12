@@ -57,6 +57,16 @@ function normalizeWhitespace(value: string): string {
     .trim();
 }
 
+function extractCodeLanguage(className: string): string {
+  if (!className) return "";
+  const match = className.match(/(?:lang|language)-([a-z0-9_+-]+)/i);
+  return match ? match[1] : "";
+}
+
+// Marker for code blocks to protect them from stripTags
+const CODE_BLOCK_PLACEHOLDER_PREFIX = "\x00CODE_BLOCK_";
+const CODE_BLOCK_PLACEHOLDER_SUFFIX = "_END\x00";
+
 export function htmlToMarkdown(html: string): { text: string; title?: string } {
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? normalizeWhitespace(stripTags(titleMatch[1])) : undefined;
@@ -64,6 +74,46 @@ export function htmlToMarkdown(html: string): { text: string; title?: string } {
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, "");
+
+  // Extract and store code blocks before stripTags
+  const codeBlocks: string[] = [];
+
+  // Convert code blocks: <pre><code class="lang-xxx">...</code></pre> to placeholders
+  text = text.replace(
+    /<pre[^>]*>(?:\s*<code([^>]*)>([\s\S]*?)<\/code>\s*|<\/pre>)/gi,
+    (_, codeAttrs = "", codeContent = "") => {
+      const classMatch = codeAttrs.match(/class=["']([^"']+)["']/);
+      const lang = classMatch ? extractCodeLanguage(classMatch[1]) : "";
+      const cleanCode = codeContent
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, " ");
+      const markdownCode = `\n\`\`\`${lang}\n${cleanCode}\n\`\`\`\n`;
+      const index = codeBlocks.length;
+      codeBlocks.push(markdownCode);
+      return `${CODE_BLOCK_PLACEHOLDER_PREFIX}${index}${CODE_BLOCK_PLACEHOLDER_SUFFIX}`;
+    },
+  );
+
+  // Convert inline code: <code>...</code> to placeholders
+  text = text.replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, (_, codeContent) => {
+    const cleanCode = codeContent
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\n/g, " ");
+    const markdownCode = `\`${cleanCode}\``;
+    const index = codeBlocks.length;
+    codeBlocks.push(markdownCode);
+    return `${CODE_BLOCK_PLACEHOLDER_PREFIX}${index}${CODE_BLOCK_PLACEHOLDER_SUFFIX}`;
+  });
+
   text = text.replace(/<a\s+[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, (_, href, body) => {
     const label = normalizeWhitespace(stripTags(body));
     if (!label) {
@@ -84,6 +134,13 @@ export function htmlToMarkdown(html: string): { text: string; title?: string } {
     .replace(/<(br|hr)\s*\/?>/gi, "\n")
     .replace(/<\/(p|div|section|article|header|footer|table|tr|ul|ol)>/gi, "\n");
   text = stripTags(text);
+
+  // Restore code blocks
+  text = text.replace(
+    new RegExp(`${CODE_BLOCK_PLACEHOLDER_PREFIX}(\\d+)${CODE_BLOCK_PLACEHOLDER_SUFFIX}`, "g"),
+    (_, index) => codeBlocks[Number.parseInt(index, 10)] ?? "",
+  );
+
   text = normalizeWhitespace(text);
   return { text, title };
 }
