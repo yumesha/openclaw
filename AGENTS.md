@@ -56,6 +56,76 @@
   `pkill -9 -f openclaw-gateway || true; nohup openclaw gateway run --bind loopback --port 18789 --force > /tmp/openclaw-gateway.log 2>&1 &`
 - Verify: `openclaw channels status --probe`, `ss -ltnp | rg 18789`, `tail -n 120 /tmp/openclaw-gateway.log`.
 
+## NixOS Local Dev Workflow (aemeth)
+
+**Important:** Always use the local dev version (`~/github/openclaw`), NOT the Nix-managed version (`openclaw-v2026.2.16`).
+
+### Starting Local Dev Gateway
+
+1. **Stop/disable Nix-managed service** (must do first!):
+   ```bash
+   systemctl --user stop openclaw-gateway.service
+   systemctl --user disable openclaw-gateway.service
+   ```
+
+2. **Start local dev version**:
+   ```bash
+   cd ~/github/openclaw
+   nohup npx tsx openclaw.mjs gateway > /tmp/openclaw-local.log 2>&1 &
+   ```
+
+3. **Verify running**:
+   ```bash
+   ps aux | grep -E "(tsx|openclaw)" | grep -v grep
+   tail -f /tmp/openclaw-local.log
+   ```
+
+### Gateway Status Check
+
+```bash
+# Check if local dev is running (should see tsx + openclaw processes)
+ps aux | grep -E "tsx.*openclaw" | grep -v grep
+
+# Check listening ports
+ss -ltnp | grep 8080
+
+# View logs
+tail -f /tmp/openclaw-local.log
+tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
+```
+
+### Stopping Local Dev
+
+```bash
+# Kill local dev processes
+pkill -f "tsx openclaw.mjs"
+pkill -f "openclaw gateway"
+
+# Re-enable Nix-managed service (if needed)
+systemctl --user enable openclaw-gateway.service
+systemctl --user start openclaw-gateway.service
+```
+
+### Authentication (API Key)
+
+Auth profile stored at: `~/.openclaw/agents/main/agent/auth-profiles.json`
+
+Format for API key auth:
+```json
+{
+  "version": 1,
+  "profiles": {
+    "kimi-coding:kimi-code": {
+      "type": "api_key",
+      "provider": "kimi-coding",
+      "key": "sk-kimi-..."
+    }
+  }
+}
+```
+
+**Note:** NixOS module generates this automatically from SOPS secrets on rebuild.
+
 ## Build, Test, and Development Commands
 
 - Runtime baseline: Node **22+** (keep Node + Bun paths working).
