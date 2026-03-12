@@ -229,7 +229,7 @@ export function buildKimiCodingProvider(): ProviderConfig {
         id: KIMI_CODING_DEFAULT_MODEL_ID,
         name: "Kimi for Coding",
         reasoning: true,
-        input: ["text", "image"],
+        input: ["text", "image", "video"],
         cost: KIMI_CODING_DEFAULT_COST,
         contextWindow: KIMI_CODING_DEFAULT_CONTEXT_WINDOW,
         maxTokens: KIMI_CODING_DEFAULT_MAX_TOKENS,
