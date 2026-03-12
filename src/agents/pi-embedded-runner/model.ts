@@ -94,7 +94,7 @@ function applyConfiguredProviderOverrides(params: {
     api: configuredModel?.api ?? providerConfig.api ?? discoveredModel.api,
     baseUrl: providerConfig.baseUrl ?? discoveredModel.baseUrl,
     reasoning: configuredModel?.reasoning ?? discoveredModel.reasoning,
-    input: configuredModel?.input ?? discoveredModel.input,
+    input: (configuredModel?.input ?? discoveredModel.input) as Array<"text" | "image">,
     cost: configuredModel?.cost ?? discoveredModel.cost,
     contextWindow: configuredModel?.contextWindow ?? discoveredModel.contextWindow,
     maxTokens: configuredModel?.maxTokens ?? discoveredModel.maxTokens,

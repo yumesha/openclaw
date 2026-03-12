@@ -6,7 +6,7 @@ export type KilocodeModelCatalogEntry = {
   id: string;
   name: string;
   reasoning: boolean;
-  input: Array<"text" | "image">;
+  input: Array<"text" | "image" | "video">;
   contextWindow?: number;
   maxTokens?: number;
 };
