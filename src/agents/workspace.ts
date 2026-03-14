@@ -43,48 +43,101 @@ const MAX_WORKSPACE_BOOTSTRAP_FILE_BYTES = 2 * 1024 * 1024;
 const workspaceFileCache = new Map<string, { content: string; identity: string }>();
 
 /**
- * Read workspace files via boundary-safe open and cache by inode/dev/size/mtime identity.
+ * Read workspace files via boundary-safe open and cache by path/size/mtime identity.
+ * Dev and inode are intentionally excluded as they can be unstable in VM environments.
  */
 type WorkspaceGuardedReadResult =
   | { ok: true; content: string }
   | { ok: false; reason: "path" | "validation" | "io"; error?: unknown };
 
 function workspaceFileIdentity(stat: syncFs.Stats, canonicalPath: string): string {
-  return `${canonicalPath}|${stat.dev}:${stat.ino}:${stat.size}:${stat.mtimeMs}`;
+  // Use path+size+mtime for identity. Dev and inode are excluded because they
+  // can be unstable in VM environments (e.g., VirtualBox shared folders, NFS,
+  // Docker volumes), causing unnecessary cache misses.
+  // The collision risk (same path, size, and mtime but different content) is
+  // extremely low in practice.
+  return `${canonicalPath}|${stat.size}:${stat.mtimeMs}`;
 }
 
 async function readWorkspaceFileWithGuards(params: {
   filePath: string;
   workspaceDir: string;
 }): Promise<WorkspaceGuardedReadResult> {
-  const opened = await openBoundaryFile({
-    absolutePath: params.filePath,
-    rootPath: params.workspaceDir,
-    boundaryLabel: "workspace root",
-    maxBytes: MAX_WORKSPACE_BOOTSTRAP_FILE_BYTES,
-  });
-  if (!opened.ok) {
-    workspaceFileCache.delete(params.filePath);
-    return opened;
-  }
-
-  const identity = workspaceFileIdentity(opened.stat, opened.path);
-  const cached = workspaceFileCache.get(params.filePath);
-  if (cached && cached.identity === identity) {
-    syncFs.closeSync(opened.fd);
-    return { ok: true, content: cached.content };
-  }
-
+  // Try boundary-safe open first. This may throw if symlinks escape the boundary.
+  let opened: Awaited<ReturnType<typeof openBoundaryFile>>;
   try {
-    const content = syncFs.readFileSync(opened.fd, "utf-8");
-    workspaceFileCache.set(params.filePath, { content, identity });
-    return { ok: true, content };
-  } catch (error) {
-    workspaceFileCache.delete(params.filePath);
-    return { ok: false, reason: "io", error };
-  } finally {
-    syncFs.closeSync(opened.fd);
+    opened = await openBoundaryFile({
+      absolutePath: params.filePath,
+      rootPath: params.workspaceDir,
+      boundaryLabel: "workspace root",
+      maxBytes: MAX_WORKSPACE_BOOTSTRAP_FILE_BYTES,
+    });
+  } catch {
+    // If boundary open throws (e.g., symlink escapes boundary), fall through
+    // to symlink handling below.
+    opened = { ok: false, reason: "path" };
   }
+
+  if (opened.ok) {
+    const identity = workspaceFileIdentity(opened.stat, opened.path);
+    const cached = workspaceFileCache.get(params.filePath);
+    if (cached && cached.identity === identity) {
+      syncFs.closeSync(opened.fd);
+      return { ok: true, content: cached.content };
+    }
+
+    try {
+      const content = syncFs.readFileSync(opened.fd, "utf-8");
+      workspaceFileCache.set(params.filePath, { content, identity });
+      return { ok: true, content };
+    } catch (error) {
+      workspaceFileCache.delete(params.filePath);
+      return { ok: false, reason: "io", error };
+    } finally {
+      syncFs.closeSync(opened.fd);
+    }
+  }
+
+  // Fallback: Handle symlinks that point outside the workspace (e.g., dotfiles).
+  // This is a legitimate use case where users symlink AGENTS.md, SOUL.md, etc.
+  // from a dotfiles repository to their workspace.
+  try {
+    const lstat = await fs.lstat(params.filePath);
+    if (lstat.isSymbolicLink()) {
+      const realPath = await fs.realpath(params.filePath);
+      const resolvedDir = resolveUserPath(params.workspaceDir);
+      
+      // Security: Verify the symlink target is within the user's home directory
+      // to prevent arbitrary file reads outside the user's control.
+      const homeDir = os.homedir();
+      const relativeToHome = path.relative(homeDir, realPath);
+      if (relativeToHome.startsWith("..") || path.isAbsolute(relativeToHome)) {
+        workspaceFileCache.delete(params.filePath);
+        return { ok: false, reason: "validation", error: new Error("Symlink target outside home directory") };
+      }
+
+      const stat = await fs.stat(realPath);
+      if (stat.size > MAX_WORKSPACE_BOOTSTRAP_FILE_BYTES) {
+        workspaceFileCache.delete(params.filePath);
+        return { ok: false, reason: "validation", error: new Error("File too large") };
+      }
+
+      const identity = workspaceFileIdentity(stat, realPath);
+      const cached = workspaceFileCache.get(params.filePath);
+      if (cached && cached.identity === identity) {
+        return { ok: true, content: cached.content };
+      }
+
+      const content = await fs.readFile(realPath, "utf-8");
+      workspaceFileCache.set(params.filePath, { content, identity });
+      return { ok: true, content };
+    }
+  } catch {
+    // Fall through to return original error
+  }
+
+  workspaceFileCache.delete(params.filePath);
+  return opened;
 }
 
 function stripFrontMatter(content: string): string {

@@ -35,6 +35,8 @@ Docs: https://docs.openclaw.ai
 
 ### Fixes
 
+- Bootstrap/workspace file cache: exclude `dev` and `ino` from file identity to avoid unnecessary cache misses in VM environments (VirtualBox, NFS, Docker volumes) where these values can be unstable. Cache now uses `path+size+mtime` for identity, matching the reliability needs of containerized and virtualized deployments.
+- Bootstrap/workspace file loading: support symlinks that point outside the workspace directory (e.g., dotfiles management setups). Previously, symlinked AGENTS.md/SOUL.md/etc. pointing to external locations were incorrectly shown as [MISSING].
 - Gateway/Telegram stale-socket restart guard: only apply stale-socket restarts to channels that publish event-liveness timestamps, preventing Telegram providers from being misclassified as stale solely due to long uptime and avoiding restart/pairing storms after upgrade. (openclaw#38464)
 - Onboarding/headless Linux daemon probe hardening: treat `systemctl --user is-enabled` probe failures as non-fatal during daemon install flow so onboarding no longer crashes on SSH/headless VPS environments before showing install guidance. (#37297) Thanks @acarbajal-web.
 - Memory/QMD mcporter Windows spawn hardening: when `mcporter.cmd` launch fails with `spawn EINVAL`, retry via bare `mcporter` shell resolution so QMD recall can continue instead of falling back to builtin memory search. (#27402) Thanks @i0ivi0i.

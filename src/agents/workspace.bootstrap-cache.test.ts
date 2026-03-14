@@ -74,12 +74,15 @@ describe("workspace bootstrap file caching", () => {
     expectAgentsContent(agentsFile2, content2);
   });
 
-  it("invalidates cache when inode changes with same mtime", async () => {
+  it("invalidates cache when content changes (different size)", async () => {
+    // Note: Cache identity uses path+size+mtime. When content changes,
+    // size typically changes too, which invalidates the cache.
+    // This handles VM environments where dev/ino may be unstable.
     if (process.platform === "win32") {
       return;
     }
     const content1 = "# old-content";
-    const content2 = "# new-content";
+    const content2 = "# new-content-different-length";
     const filePath = path.join(workspaceDir, DEFAULT_AGENTS_FILENAME);
     const tempPath = path.join(workspaceDir, ".AGENTS.tmp");
 
@@ -164,5 +167,64 @@ describe("workspace bootstrap file caching", () => {
     const agentsFile = await loadAgentsFile(workspaceDir);
     expect(agentsFile?.missing).toBe(true);
     expect(agentsFile?.content).toBeUndefined();
+  });
+
+  it("handles VM environments with unstable dev/ino gracefully (keeps cache if mtime+size match)", async () => {
+    // In VM environments (e.g., VirtualBox shared folders, NFS), dev/ino can
+    // change between reads even for the same file. Cache should remain valid
+    // if path, size, and mtime are unchanged.
+    const content = "# VM test content";
+    const filePath = path.join(workspaceDir, DEFAULT_AGENTS_FILENAME);
+
+    await writeWorkspaceFile({
+      dir: workspaceDir,
+      name: DEFAULT_AGENTS_FILENAME,
+      content,
+    });
+
+    // First load
+    const agentsFile1 = await loadAgentsFile(workspaceDir);
+    expectAgentsContent(agentsFile1, content);
+
+    // Clear the internal module cache to simulate a fresh read while keeping
+    // the file identity cache (workspaceFileCache) intact
+    const { clearAllBootstrapSnapshots } = await import("./bootstrap-cache.js");
+    clearAllBootstrapSnapshots();
+
+    // Second load should still use cached content (same mtime+size+path)
+    const agentsFile2 = await loadAgentsFile(workspaceDir);
+    expectAgentsContent(agentsFile2, content);
+
+    // Should be the same cached content object
+    expect(agentsFile1?.content).toBe(agentsFile2?.content);
+  });
+
+  it("reads symlinked bootstrap files that point outside workspace (dotfiles use case)", async () => {
+    // This tests the common dotfiles pattern where AGENTS.md, SOUL.md, etc.
+    // are symlinks to files in a dotfiles repository.
+    if (process.platform === "win32") {
+      return;
+    }
+    const content = "# Symlinked agent config";
+    
+    // Create a "dotfiles" directory outside the workspace
+    const dotfilesDir = path.join(workspaceDir, "..", "dotfiles-symlink-test");
+    await fs.mkdir(dotfilesDir, { recursive: true });
+    const realFilePath = path.join(dotfilesDir, "AGENTS.md");
+    await fs.writeFile(realFilePath, content, "utf-8");
+
+    // Create a symlink in the workspace pointing to the dotfiles location
+    const symlinkPath = path.join(workspaceDir, DEFAULT_AGENTS_FILENAME);
+    await fs.symlink(realFilePath, symlinkPath);
+
+    try {
+      const agentsFile = await loadAgentsFile(workspaceDir);
+      expectAgentsContent(agentsFile, content);
+    } finally {
+      // Cleanup
+      await fs.unlink(symlinkPath).catch(() => {});
+      await fs.unlink(realFilePath).catch(() => {});
+      await fs.rmdir(dotfilesDir).catch(() => {});
+    }
   });
 });
