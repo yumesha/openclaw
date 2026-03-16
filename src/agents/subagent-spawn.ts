@@ -12,7 +12,7 @@ import {
   parseAgentSessionKey,
 } from "../routing/session-key.js";
 import { normalizeDeliveryContext } from "../utils/delivery-context.js";
-import { resolveAgentConfig } from "./agent-scope.js";
+import { resolveAgentConfig, resolveAgentWorkspaceDir } from "./agent-scope.js";
 import { AGENT_LANE_SUBAGENT } from "./lanes.js";
 import { resolveSubagentSpawnModelSelection } from "./model-selection.js";
 import { resolveSandboxRuntimeStatus } from "./sandbox/runtime-status.js";
@@ -543,14 +543,20 @@ export async function spawnSubagentDirect(
     agentGroupSpace: ctx.agentGroupSpace,
     workspaceDir: ctx.workspaceDir,
   });
+  // When spawning with a specific agentId, use that agent's workspace
+  // Otherwise inherit from the requester
+  const targetWorkspaceDir = targetAgentId !== requesterAgentId
+    ? resolveAgentWorkspaceDir(cfg, targetAgentId)
+    : resolveSpawnedWorkspaceInheritance({
+        config: cfg,
+        requesterSessionKey: requesterInternalKey,
+        explicitWorkspaceDir: toolSpawnMetadata.workspaceDir,
+      });
+
   const spawnedMetadata = normalizeSpawnedRunMetadata({
     spawnedBy: spawnedByKey,
     ...toolSpawnMetadata,
-    workspaceDir: resolveSpawnedWorkspaceInheritance({
-      config: cfg,
-      requesterSessionKey: requesterInternalKey,
-      explicitWorkspaceDir: toolSpawnMetadata.workspaceDir,
-    }),
+    workspaceDir: targetWorkspaceDir,
   });
 
   const childIdem = crypto.randomUUID();
