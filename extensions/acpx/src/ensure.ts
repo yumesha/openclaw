@@ -1,12 +1,26 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { PluginLogger } from "openclaw/plugin-sdk/acpx";
-import { ACPX_PINNED_VERSION, ACPX_PLUGIN_ROOT, buildAcpxLocalInstallCommand } from "./config.js";
+import {
+  ACPX_PINNED_VERSION,
+  ACPX_PLUGIN_ROOT,
+  ACPX_USER_INSTALL_BIN,
+  buildAcpxLocalInstallCommand,
+} from "./config.js";
 import {
   resolveSpawnFailure,
   type SpawnCommandOptions,
   spawnAndCollect,
 } from "./runtime-internals/process.js";
+
+function isDirectoryWritable(dir: string): boolean {
+  try {
+    fs.accessSync(dir, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const SEMVER_PATTERN = /\b\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\b/;
 
@@ -210,6 +224,11 @@ export async function ensureAcpx(params: {
     const installVersion = expectedVersion ?? ACPX_PINNED_VERSION;
     const allowInstall = params.allowInstall ?? true;
 
+    // Check if plugin directory is writable (may be read-only in Nix, Docker, etc.)
+    const isBundledDirWritable = isDirectoryWritable(pluginRoot);
+    const userInstallDir = path.dirname(path.dirname(ACPX_USER_INSTALL_BIN));
+    const installTargetDir = isBundledDirWritable ? pluginRoot : userInstallDir;
+
     const precheck = await checkAcpxVersion({
       command: params.command,
       cwd: pluginRoot,
@@ -223,18 +242,33 @@ export async function ensureAcpx(params: {
       throw new Error(precheck.message);
     }
 
-    params.logger?.warn(
-      `acpx local binary unavailable or mismatched (${precheck.message}); running plugin-local install`,
-    );
+    // If bundled dir is not writable, we'll install to user dir instead
+    if (!isBundledDirWritable) {
+      params.logger?.warn(
+        `acpx plugin directory is read-only (${pluginRoot}); installing to user extensions dir instead`,
+      );
+      // Ensure user install dir exists
+      try {
+        fs.mkdirSync(installTargetDir, { recursive: true });
+      } catch (err) {
+        throw new Error(
+          `failed to create user install directory ${installTargetDir}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    } else {
+      params.logger?.warn(
+        `acpx local binary unavailable or mismatched (${precheck.message}); running plugin-local install`,
+      );
+    }
 
     const install = await spawnAndCollect({
       command: "npm",
       args: ["install", "--omit=dev", "--no-save", `acpx@${installVersion}`],
-      cwd: pluginRoot,
+      cwd: installTargetDir,
     });
 
     if (install.error) {
-      const spawnFailure = resolveSpawnFailure(install.error, pluginRoot);
+      const spawnFailure = resolveSpawnFailure(install.error, installTargetDir);
       if (spawnFailure === "missing-command") {
         throw new Error("npm is required to install plugin-local acpx but was not found on PATH");
       }
@@ -248,9 +282,12 @@ export async function ensureAcpx(params: {
       throw new Error(`failed to install plugin-local acpx: ${detail}`);
     }
 
+    // Determine the correct binary path for post-install check
+    const postcheckCommand = isBundledDirWritable ? params.command : ACPX_USER_INSTALL_BIN;
+
     const postcheck = await checkAcpxVersion({
-      command: params.command,
-      cwd: pluginRoot,
+      command: postcheckCommand,
+      cwd: installTargetDir,
       expectedVersion,
       spawnOptions: params.spawnOptions,
     });
@@ -259,7 +296,7 @@ export async function ensureAcpx(params: {
       throw new Error(`plugin-local acpx verification failed after install: ${postcheck.message}`);
     }
 
-    params.logger?.info(`acpx plugin-local binary ready (version ${postcheck.version})`);
+    params.logger?.info(`acpx plugin-local binary ready at ${installTargetDir} (version ${postcheck.version})`);
   })();
 
   try {

@@ -15,6 +15,9 @@ const { resolveSpawnFailureMock, spawnAndCollectMock } = vi.hoisted(() => ({
   spawnAndCollectMock: vi.fn(),
 }));
 
+// Track which directories should appear writable for testing
+let writableDirs: string[] = [];
+
 vi.mock("./runtime-internals/process.js", () => ({
   resolveSpawnFailure: resolveSpawnFailureMock,
   spawnAndCollect: spawnAndCollectMock,
@@ -24,11 +27,31 @@ import { checkAcpxVersion, ensureAcpx } from "./ensure.js";
 
 describe("acpx ensure", () => {
   const tempDirs: string[] = [];
+  const originalAccessSync = fs.accessSync;
 
   beforeEach(() => {
     resolveSpawnFailureMock.mockReset();
     resolveSpawnFailureMock.mockReturnValue(null);
     spawnAndCollectMock.mockReset();
+    writableDirs = [];
+    
+    // Mock fs.accessSync to check writableDirs for W_OK
+    vi.spyOn(fs, "accessSync").mockImplementation((filepath: fs.PathLike, mode?: number) => {
+      const pathStr = String(filepath);
+      // For W_OK checks, consult writableDirs
+      if (mode === fs.constants.W_OK) {
+        if (writableDirs.some((dir) => pathStr.startsWith(dir))) {
+          return;
+        }
+        throw new Error("EACCES: permission denied");
+      }
+      // Passthrough for other modes
+      return originalAccessSync(filepath, mode);
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   function makeTempAcpxInstall(version: string): string {
@@ -152,6 +175,9 @@ describe("acpx ensure", () => {
   });
 
   it("installs and verifies pinned acpx when precheck fails", async () => {
+    // Mark /plugin as writable so it installs there (not user dir)
+    writableDirs = ["/plugin"];
+    
     spawnAndCollectMock
       .mockResolvedValueOnce({
         stdout: "acpx 0.0.9\n",
@@ -184,6 +210,47 @@ describe("acpx ensure", () => {
       args: ["install", "--omit=dev", "--no-save", `acpx@${ACPX_PINNED_VERSION}`],
       cwd: "/plugin",
     });
+  });
+
+  it("installs to user extensions dir when plugin dir is read-only (Nix/Docker)", async () => {
+    // /plugin is NOT writable, so it should fallback to user dir
+    writableDirs = [];
+    
+    spawnAndCollectMock
+      .mockResolvedValueOnce({
+        stdout: "",
+        stderr: "",
+        code: 1,
+        error: new Error("ENOENT: no such file or directory"),
+      })
+      .mockResolvedValueOnce({
+        stdout: "added 1 package\n",
+        stderr: "",
+        code: 0,
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        stdout: `acpx ${ACPX_PINNED_VERSION}\n`,
+        stderr: "",
+        code: 0,
+        error: null,
+      });
+
+    await ensureAcpx({
+      command: "/plugin/node_modules/.bin/acpx",
+      pluginRoot: "/plugin",
+      expectedVersion: ACPX_PINNED_VERSION,
+    });
+
+    expect(spawnAndCollectMock).toHaveBeenCalledTimes(3);
+    // npm install should target user extensions dir, not /plugin
+    const installCall = spawnAndCollectMock.mock.calls[1]?.[0];
+    expect(installCall).toMatchObject({
+      command: "npm",
+      args: ["install", "--omit=dev", "--no-save", `acpx@${ACPX_PINNED_VERSION}`],
+    });
+    expect(installCall.cwd).toContain(".openclaw/extensions/acpx");
+    expect(installCall.cwd).not.toBe("/plugin");
   });
 
   it("fails with actionable error when npm install fails", async () => {

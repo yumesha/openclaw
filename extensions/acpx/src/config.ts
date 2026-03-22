@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { OpenClawPluginConfigSchema } from "openclaw/plugin-sdk/acpx";
@@ -13,10 +15,41 @@ export const ACPX_VERSION_ANY = "any";
 const ACPX_BIN_NAME = process.platform === "win32" ? "acpx.cmd" : "acpx";
 export const ACPX_PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const ACPX_BUNDLED_BIN = path.join(ACPX_PLUGIN_ROOT, "node_modules", ".bin", ACPX_BIN_NAME);
+
+function resolveUserInstallDir(): string {
+  const configDir = process.env.OPENCLAW_CONFIG_DIR || process.env.OPENCLAW_DATA_DIR;
+  if (configDir) {
+    return path.join(configDir, "extensions", "acpx");
+  }
+  return path.join(os.homedir(), ".openclaw", "extensions", "acpx");
+}
+
+export const ACPX_USER_INSTALL_BIN = path.join(resolveUserInstallDir(), "node_modules", ".bin", ACPX_BIN_NAME);
+
 export function buildAcpxLocalInstallCommand(version: string = ACPX_PINNED_VERSION): string {
   return `npm install --omit=dev --no-save acpx@${version}`;
 }
 export const ACPX_LOCAL_INSTALL_COMMAND = buildAcpxLocalInstallCommand();
+
+/**
+ * Resolve the effective acpx binary path.
+ * Falls back to user install directory if bundled binary doesn't exist.
+ */
+export function resolveAcpxBinary(preferredCommand?: string): string {
+  // If a custom command is configured, use it
+  if (preferredCommand && preferredCommand !== ACPX_BUNDLED_BIN) {
+    return preferredCommand;
+  }
+  
+  // Check if bundled binary exists
+  try {
+    fs.accessSync(ACPX_BUNDLED_BIN, fs.constants.X_OK);
+    return ACPX_BUNDLED_BIN;
+  } catch {
+    // Fallback to user install location
+    return ACPX_USER_INSTALL_BIN;
+  }
+}
 
 export type McpServerConfig = {
   command: string;
@@ -235,7 +268,7 @@ function parseAcpxPluginConfig(value: unknown): ParseResult {
 function resolveConfiguredCommand(params: { configured?: string; workspaceDir?: string }): string {
   const configured = params.configured?.trim();
   if (!configured) {
-    return ACPX_BUNDLED_BIN;
+    return resolveAcpxBinary();
   }
   if (path.isAbsolute(configured) || configured.includes(path.sep) || configured.includes("/")) {
     const baseDir = params.workspaceDir?.trim() || process.cwd();
