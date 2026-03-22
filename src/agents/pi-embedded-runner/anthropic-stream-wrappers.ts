@@ -274,28 +274,60 @@ export function createAnthropicToolPayloadCompatibilityWrapper(
 ): StreamFn {
   const underlying = baseStreamFn ?? streamSimple;
   return (model, context, options) => {
+    // INFO level to ensure visibility - this wrapper is applied to ALL providers
+    log.info(
+      `anthropic-tool-wrapper: ${model.provider}/${model.id} api=${model.api} tools=${context.tools?.length ?? 0}`,
+    );
     const originalOnPayload = options?.onPayload;
     return underlying(model, context, {
       ...options,
       onPayload: (payload, payloadModel) => {
-        if (
-          payload &&
-          typeof payload === "object" &&
-          requiresAnthropicToolPayloadCompatibilityForModel(model)
-        ) {
+        const payloadTools = payload && typeof payload === "object" ? (payload as Record<string, unknown>).tools : undefined;
+        // Log actual values for debugging
+        log.info(
+          `anthropic-tool-wrapper onPayload: provider=${model.provider} api=${model.api} payloadTools=${Array.isArray(payloadTools) ? payloadTools.length : 0}`,
+        );
+        if (payload && typeof payload === "object") {
           const payloadObj = payload as Record<string, unknown>;
-          if (
-            Array.isArray(payloadObj.tools) &&
-            usesOpenAiFunctionAnthropicToolSchemaForModel(model)
-          ) {
-            payloadObj.tools = payloadObj.tools
-              .map((tool) => normalizeOpenAiFunctionAnthropicToolDefinition(tool))
-              .filter((tool): tool is Record<string, unknown> => !!tool);
-          }
-          if (usesOpenAiStringModeAnthropicToolChoiceForModel(model)) {
-            payloadObj.tool_choice = normalizeOpenAiStringModeAnthropicToolChoice(
-              payloadObj.tool_choice,
+          
+          // Inject tool_choice: {type: "auto"} for native Anthropic API when tools are present
+          // but tool_choice is not set. Claude defaults to NOT using tools otherwise.
+          const payloadToolsArray = Array.isArray(payloadObj.tools) ? payloadObj.tools : undefined;
+          const shouldInject =
+            model.api === "anthropic-messages" &&
+            model.provider === "anthropic" &&
+            payloadToolsArray &&
+            payloadToolsArray.length > 0 &&
+            payloadObj.tool_choice === undefined;
+          
+          log.info(
+            `anthropic-tool-wrapper inject check: api=${model.api}, provider=${model.provider}, hasTools=${!!payloadToolsArray && payloadToolsArray.length > 0}, tool_choice=${payloadObj.tool_choice}, shouldInject=${shouldInject}`,
+          );
+          
+          if (shouldInject && payloadToolsArray) {
+            log.info(
+              `injecting tool_choice={type:auto} for ${model.provider}/${model.id} (${payloadToolsArray.length} tools)`,
             );
+            payloadObj.tool_choice = { type: "auto" };
+            log.info(
+              `tool_choice after injection: ${JSON.stringify(payloadObj.tool_choice)}`,
+            );
+          }
+          
+          if (requiresAnthropicToolPayloadCompatibilityForModel(model)) {
+            if (
+              Array.isArray(payloadObj.tools) &&
+              usesOpenAiFunctionAnthropicToolSchemaForModel(model)
+            ) {
+              payloadObj.tools = payloadObj.tools
+                .map((tool) => normalizeOpenAiFunctionAnthropicToolDefinition(tool))
+                .filter((tool): tool is Record<string, unknown> => !!tool);
+            }
+            if (usesOpenAiStringModeAnthropicToolChoiceForModel(model)) {
+              payloadObj.tool_choice = normalizeOpenAiStringModeAnthropicToolChoice(
+                payloadObj.tool_choice,
+              );
+            }
           }
         }
         return originalOnPayload?.(payload, payloadModel);
