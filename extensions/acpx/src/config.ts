@@ -24,7 +24,8 @@ function resolveUserInstallDir(): string {
   return path.join(os.homedir(), ".openclaw", "extensions", "acpx");
 }
 
-export const ACPX_USER_INSTALL_BIN = path.join(resolveUserInstallDir(), "node_modules", ".bin", ACPX_BIN_NAME);
+export const ACPX_USER_INSTALL_DIR = resolveUserInstallDir();
+export const ACPX_USER_INSTALL_BIN = path.join(ACPX_USER_INSTALL_DIR, "node_modules", ".bin", ACPX_BIN_NAME);
 
 export function buildAcpxLocalInstallCommand(version: string = ACPX_PINNED_VERSION): string {
   return `npm install --omit=dev --no-save acpx@${version}`;

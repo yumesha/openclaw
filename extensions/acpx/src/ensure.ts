@@ -5,6 +5,7 @@ import {
   ACPX_PINNED_VERSION,
   ACPX_PLUGIN_ROOT,
   ACPX_USER_INSTALL_BIN,
+  ACPX_USER_INSTALL_DIR,
   buildAcpxLocalInstallCommand,
 } from "./config.js";
 import {
@@ -226,8 +227,7 @@ export async function ensureAcpx(params: {
 
     // Check if plugin directory is writable (may be read-only in Nix, Docker, etc.)
     const isBundledDirWritable = isDirectoryWritable(pluginRoot);
-    const userInstallDir = path.dirname(path.dirname(ACPX_USER_INSTALL_BIN));
-    const installTargetDir = isBundledDirWritable ? pluginRoot : userInstallDir;
+    const installTargetDir = isBundledDirWritable ? pluginRoot : ACPX_USER_INSTALL_DIR;
 
     const precheck = await checkAcpxVersion({
       command: params.command,
