@@ -364,7 +364,9 @@ export function resolveAcpxPluginConfig(params: {
     configured: normalized.command,
     workspaceDir: params.workspaceDir,
   });
-  const allowPluginLocalInstall = command === ACPX_BUNDLED_BIN;
+  // Allow plugin-local install when using bundled bin or user install bin
+  // (i.e., not using a custom user-configured command path)
+  const allowPluginLocalInstall = command === ACPX_BUNDLED_BIN || command === ACPX_USER_INSTALL_BIN;
   const configuredExpectedVersion = normalized.expectedVersion;
   const expectedVersion =
     configuredExpectedVersion === ACPX_VERSION_ANY
