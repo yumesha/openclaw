@@ -518,6 +518,7 @@ export const DiscordAccountSchema = z
       .object({
         presence: z.boolean().optional(),
         guildMembers: z.boolean().optional(),
+        guildMessageReactions: z.boolean().optional(),
       })
       .strict()
       .optional(),

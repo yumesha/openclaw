@@ -763,6 +763,7 @@ export const FIELD_LABELS: Record<string, string> = {
   "channels.discord.ui.components.accentColor": "Discord Component Accent Color",
   "channels.discord.intents.presence": "Discord Presence Intent",
   "channels.discord.intents.guildMembers": "Discord Guild Members Intent",
+  "channels.discord.intents.guildMessageReactions": "Discord Guild Message Reactions Intent",
   "channels.discord.voice.enabled": "Discord Voice Enabled",
   "channels.discord.voice.autoJoin": "Discord Voice Auto-Join",
   "channels.discord.voice.daveEncryption": "Discord Voice DAVE Encryption",

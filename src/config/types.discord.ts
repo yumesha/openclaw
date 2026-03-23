@@ -104,6 +104,8 @@ export type DiscordIntentsConfig = {
   presence?: boolean;
   /** Enable Guild Members privileged intent (requires Portal opt-in). Default: false. */
   guildMembers?: boolean;
+  /** Enable Guild Message Reactions intent. Default: true (for backward compatibility). Set to false to reduce CPU usage from reaction events. */
+  guildMessageReactions?: boolean;
 };
 
 export type DiscordVoiceAutoJoinConfig = {

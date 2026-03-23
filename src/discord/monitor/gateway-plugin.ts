@@ -15,9 +15,15 @@ export function resolveDiscordGatewayIntents(
     GatewayIntents.GuildMessages |
     GatewayIntents.MessageContent |
     GatewayIntents.DirectMessages |
-    GatewayIntents.GuildMessageReactions |
     GatewayIntents.DirectMessageReactions |
     GatewayIntents.GuildVoiceStates;
+  
+  // GuildMessageReactions is opt-out (default: true) for backward compatibility
+  // Set intents.guildMessageReactions = false to reduce CPU from reaction events
+  if (intentsConfig?.guildMessageReactions !== false) {
+    intents |= GatewayIntents.GuildMessageReactions;
+  }
+  
   if (intentsConfig?.presence) {
     intents |= GatewayIntents.GuildPresences;
   }

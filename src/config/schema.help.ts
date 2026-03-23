@@ -1537,6 +1537,8 @@ export const FIELD_HELP: Record<string, string> = {
     "Enable the Guild Presences privileged intent. Must also be enabled in the Discord Developer Portal. Allows tracking user activities (e.g. Spotify). Default: false.",
   "channels.discord.intents.guildMembers":
     "Enable the Guild Members privileged intent. Must also be enabled in the Discord Developer Portal. Default: false.",
+  "channels.discord.intents.guildMessageReactions":
+    "Enable the Guild Message Reactions intent. When enabled, the bot receives all reaction add/remove events in the guild. Disable to reduce CPU usage if reactions are not needed. Default: true (for backward compatibility).",
   "channels.discord.pluralkit.enabled":
     "Resolve PluralKit proxied messages and treat system members as distinct senders.",
   "channels.discord.pluralkit.token":
