@@ -354,6 +354,8 @@ export type DiscordAccountConfig = {
     /** Max concurrent event processing operations. Default: 50. */
     maxConcurrency?: number;
   };
+  /** Typing indicator TTL in milliseconds. Default: 120000 (2 minutes). */
+  typingTtlMs?: number;
 };
 
 export type DiscordConfig = {

@@ -565,6 +565,8 @@ export const DiscordAccountSchema = z
       })
       .strict()
       .optional(),
+    /** Typing indicator TTL in milliseconds. Default: 120000 (2 minutes). */
+    typingTtlMs: z.number().int().positive().optional(),
   })
   .strict()
   .superRefine((value, ctx) => {

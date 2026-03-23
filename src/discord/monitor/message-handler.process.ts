@@ -439,7 +439,8 @@ export async function processDiscordMessage(ctx: DiscordMessagePreflightContext)
       });
     },
     // Long tool-heavy runs are expected on Discord; keep heartbeats alive.
-    maxDurationMs: DISCORD_TYPING_MAX_DURATION_MS,
+    // Use config typingTtlMs if set, otherwise fall back to 20 minute default.
+    maxDurationMs: discordConfig?.typingTtlMs ?? DISCORD_TYPING_MAX_DURATION_MS,
   });
 
   // --- Discord draft stream (edit-based preview streaming) ---
