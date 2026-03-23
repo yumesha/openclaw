@@ -8,7 +8,7 @@ import { sleepWithAbort } from "../../infra/backoff.js";
 import { deliverOutboundPayloads } from "../../infra/outbound/deliver.js";
 import { resolveAgentOutboundIdentity } from "../../infra/outbound/identity.js";
 import { buildOutboundSessionContext } from "../../infra/outbound/session-context.js";
-import { logWarn } from "../../logger.js";
+import { logError, logWarn } from "../../logger.js";
 import type { CronJob, CronRunTelemetry } from "../types.js";
 import type { DeliveryTargetResolution } from "./delivery-target.js";
 import { pickSummaryFromOutput } from "./helpers.js";
@@ -263,18 +263,26 @@ export async function dispatchCronDelivery(
           })
         : await runDelivery();
       delivered = deliveryResults.length > 0;
+      if (!delivered) {
+        logWarn(`[cron:${params.job.id}] Delivery returned empty results`);
+      }
       return null;
     } catch (err) {
+      const errorMsg = String(err);
+      // Always log delivery errors for visibility, even in best-effort mode
+      logError(`[cron:${params.job.id}] Delivery failed: ${errorMsg}`);
       if (!params.deliveryBestEffort) {
         return params.withRunSession({
           status: "error",
           summary,
           outputText,
-          error: String(err),
+          error: errorMsg,
           deliveryAttempted,
           ...params.telemetry,
         });
       }
+      // In best-effort mode, mark as attempted but not delivered
+      delivered = false;
       return null;
     }
   };
@@ -349,17 +357,15 @@ export async function dispatchCronDelivery(
       deliveryPayloads = [{ text: completedDescendantReply }];
     }
     if (activeSubagentRuns > 0) {
-      // Parent orchestration is still in progress; avoid announcing a partial
-      // update to the main requester. Mark deliveryAttempted so the timer does
-      // not fire a redundant enqueueSystemEvent fallback (double-announce bug).
-      deliveryAttempted = true;
-      return params.withRunSession({
-        status: "ok",
-        summary,
-        outputText,
-        deliveryAttempted,
-        ...params.telemetry,
-      });
+      // Parent orchestration is still in progress after timeout.
+      // Log a warning and deliver what we have (original text) rather than
+      // silently dropping the delivery. This ensures cron jobs don't get
+      // stuck in "attempted but not delivered" state.
+      logWarn(
+        `[cron:${params.job.id}] Delivery proceeding with ${activeSubagentRuns} descendant(s) still active. ` +
+          `Subagent orchestration did not complete within timeout.`
+      );
+      // Fall through to delivery below instead of returning early
     }
     if (
       hadDescendants &&
@@ -368,17 +374,13 @@ export async function dispatchCronDelivery(
       initialSynthesizedText.toUpperCase() !== SILENT_REPLY_TOKEN.toUpperCase()
     ) {
       // Descendants existed but no post-orchestration synthesis arrived AND
-      // no descendant fallback reply was available. Suppress stale parent
-      // text like "on it, pulling everything together". Mark deliveryAttempted
-      // so the timer does not fire a redundant enqueueSystemEvent fallback.
-      deliveryAttempted = true;
-      return params.withRunSession({
-        status: "ok",
-        summary,
-        outputText,
-        deliveryAttempted,
-        ...params.telemetry,
-      });
+      // no descendant fallback reply was available. Log a warning and deliver
+      // what we have rather than silently dropping. This prevents cron jobs
+      // from getting stuck in "attempted but not delivered" state.
+      logWarn(
+        `[cron:${params.job.id}] Delivering interim text despite no subagent synthesis: "${initialSynthesizedText.slice(0, 50)}..."`
+      );
+      // Fall through to delivery below instead of suppressing
     }
     if (synthesizedText.toUpperCase() === SILENT_REPLY_TOKEN.toUpperCase()) {
       return params.withRunSession({

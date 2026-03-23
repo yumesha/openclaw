@@ -2,12 +2,15 @@ import { listDescendantRunsForRequester } from "../../agents/subagent-registry.j
 import { readLatestAssistantReply } from "../../agents/tools/agent-step.js";
 import { SILENT_REPLY_TOKEN } from "../../auto-reply/tokens.js";
 import { callGateway } from "../../gateway/call.js";
+import { logWarn } from "../../logger.js";
 
 const FAST_TEST_MODE = process.env.OPENCLAW_TEST_FAST === "1";
 
 const CRON_SUBAGENT_WAIT_MIN_MS = FAST_TEST_MODE ? 10 : 30_000;
 const CRON_SUBAGENT_FINAL_REPLY_GRACE_MS = FAST_TEST_MODE ? 50 : 5_000;
 const CRON_SUBAGENT_GRACE_POLL_MS = FAST_TEST_MODE ? 8 : 200;
+// Maximum total time to wait for descendants (5 minutes) to prevent hangs
+const CRON_SUBAGENT_MAX_TOTAL_WAIT_MS = FAST_TEST_MODE ? 100 : 5 * 60 * 1000;
 
 const SUBAGENT_FOLLOWUP_HINTS = [
   "subagent spawned",
@@ -119,7 +122,12 @@ export async function waitForDescendantSubagentSummary(params: {
   observedActiveDescendants?: boolean;
 }): Promise<string | undefined> {
   const initialReply = params.initialReply?.trim();
-  const deadline = Date.now() + Math.max(CRON_SUBAGENT_WAIT_MIN_MS, Math.floor(params.timeoutMs));
+  // Cap the total wait time to prevent indefinite hangs
+  const maxWaitMs = Math.min(
+    Math.max(CRON_SUBAGENT_WAIT_MIN_MS, Math.floor(params.timeoutMs)),
+    CRON_SUBAGENT_MAX_TOTAL_WAIT_MS
+  );
+  const deadline = Date.now() + maxWaitMs;
 
   // Snapshot the currently active descendant run IDs.
   const getActiveRuns = () =>
@@ -186,6 +194,14 @@ export async function waitForDescendantSubagentSummary(params: {
     (latest !== initialReply || !isLikelyInterimCronMessage(latest))
   ) {
     return latest;
+  }
+
+  // Log if we timed out with still-active descendants
+  const stillActive = getActiveRuns();
+  if (stillActive.length > 0) {
+    logWarn(
+      `[cron:subagent] Timed out waiting for ${stillActive.length} descendant run(s) in ${params.sessionKey}`
+    );
   }
 
   return undefined;
