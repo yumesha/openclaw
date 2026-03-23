@@ -290,6 +290,8 @@ export async function dispatchCronDelivery(
   const finalizeTextDelivery = async (
     delivery: SuccessfulDeliveryTarget,
   ): Promise<RunCronAgentTurnResult | null> => {
+    logWarn(`[cron:${params.job.id}] finalizeTextDelivery: START`);
+    
     const cleanupDirectCronSessionIfNeeded = async (): Promise<void> => {
       if (!params.job.deleteAfterRun) {
         return;
@@ -310,11 +312,16 @@ export async function dispatchCronDelivery(
     };
 
     if (!synthesizedText) {
+      logWarn(`[cron:${params.job.id}] finalizeTextDelivery: No synthesizedText, skipping`);
       return null;
     }
+    logWarn(`[cron:${params.job.id}] finalizeTextDelivery: synthesizedText present`);
     const initialSynthesizedText = synthesizedText.trim();
+    logWarn(`[cron:${params.job.id}] finalizeTextDelivery: initialSynthesizedText="${initialSynthesizedText.slice(0, 30)}..."`);
     let activeSubagentRuns = countActiveDescendantRuns(params.agentSessionKey);
+    logWarn(`[cron:${params.job.id}] finalizeTextDelivery: activeSubagentRuns=${activeSubagentRuns}`);
     const expectedSubagentFollowup = expectsSubagentFollowup(initialSynthesizedText);
+    logWarn(`[cron:${params.job.id}] finalizeTextDelivery: expectedSubagentFollowup=${expectedSubagentFollowup}`);
     // Also check for already-completed descendants. If the subagent finished
     // before delivery-dispatch runs, activeSubagentRuns is 0 and
     // expectedSubagentFollowup may be false (e.g. cron said "on it" which
@@ -328,19 +335,24 @@ export async function dispatchCronDelivery(
           })
         : undefined;
     const hadDescendants = activeSubagentRuns > 0 || Boolean(completedDescendantReply);
+    logWarn(`[cron:${params.job.id}] finalizeTextDelivery: hadDescendants=${hadDescendants}`);
     if (activeSubagentRuns > 0 || expectedSubagentFollowup) {
+      logWarn(`[cron:${params.job.id}] finalizeTextDelivery: Waiting for descendants...`);
       let finalReply = await waitForDescendantSubagentSummary({
         sessionKey: params.agentSessionKey,
         initialReply: initialSynthesizedText,
         timeoutMs: params.timeoutMs,
         observedActiveDescendants: activeSubagentRuns > 0 || expectedSubagentFollowup,
       });
+      logWarn(`[cron:${params.job.id}] finalizeTextDelivery: waitForDescendantSubagentSummary returned: ${finalReply ? 'got reply' : 'no reply'}`);
       activeSubagentRuns = countActiveDescendantRuns(params.agentSessionKey);
       if (!finalReply && activeSubagentRuns === 0) {
+        logWarn(`[cron:${params.job.id}] finalizeTextDelivery: Trying fallback reply...`);
         finalReply = await readDescendantSubagentFallbackReply({
           sessionKey: params.agentSessionKey,
           runStartedAt: params.runStartedAt,
         });
+        logWarn(`[cron:${params.job.id}] finalizeTextDelivery: fallback returned: ${finalReply ? 'got reply' : 'no reply'}`);
       }
       if (finalReply && activeSubagentRuns === 0) {
         outputText = finalReply;
@@ -399,8 +411,14 @@ export async function dispatchCronDelivery(
         ...params.telemetry,
       });
     }
+    logWarn(`[cron:${params.job.id}] finalizeTextDelivery: Calling deliverViaDirect...`);
     try {
-      return await deliverViaDirect(delivery, { retryTransient: true });
+      const result = await deliverViaDirect(delivery, { retryTransient: true });
+      logWarn(`[cron:${params.job.id}] finalizeTextDelivery: deliverViaDirect returned: ${result ? 'result with status ' + result.status : 'null'}`);
+      return result;
+    } catch (err) {
+      logError(`[cron:${params.job.id}] finalizeTextDelivery: deliverViaDirect threw: ${String(err)}`);
+      throw err;
     } finally {
       await cleanupDirectCronSessionIfNeeded();
     }
