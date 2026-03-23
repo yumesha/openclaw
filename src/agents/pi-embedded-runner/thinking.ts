@@ -3,6 +3,9 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 type AssistantContentBlock = Extract<AgentMessage, { role: "assistant" }>["content"][number];
 type AssistantMessage = Extract<AgentMessage, { role: "assistant" }>;
 
+/** Block types that should be stripped from assistant messages before API retry. */
+const THINKING_BLOCK_TYPES = new Set(["thinking", "redacted_thinking"]);
+
 export function isAssistantMessageWithContent(message: AgentMessage): message is AssistantMessage {
   return (
     !!message &&
@@ -13,7 +16,12 @@ export function isAssistantMessageWithContent(message: AgentMessage): message is
 }
 
 /**
- * Strip all `type: "thinking"` content blocks from assistant messages.
+ * Strip all thinking-related content blocks (`thinking` and `redacted_thinking`)
+ * from assistant messages.
+ *
+ * Claude's API can return both `thinking` and `redacted_thinking` blocks. When
+ * retrying requests, these blocks must be stripped to avoid API rejection with
+ * "thinking blocks in latest assistant message cannot be modified" errors.
  *
  * If an assistant message becomes empty after stripping, it is replaced with
  * a synthetic `{ type: "text", text: "" }` block to preserve turn structure
@@ -33,7 +41,11 @@ export function dropThinkingBlocks(messages: AgentMessage[]): AgentMessage[] {
     const nextContent: AssistantContentBlock[] = [];
     let changed = false;
     for (const block of msg.content) {
-      if (block && typeof block === "object" && (block as { type?: unknown }).type === "thinking") {
+      if (
+        block &&
+        typeof block === "object" &&
+        THINKING_BLOCK_TYPES.has((block as { type?: unknown }).type as string)
+      ) {
         touched = true;
         changed = true;
         continue;
