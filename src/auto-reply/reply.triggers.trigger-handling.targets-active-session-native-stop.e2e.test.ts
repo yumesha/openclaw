@@ -154,7 +154,7 @@ describe("trigger handling", () => {
         {
           error: "sandbox is not defined.",
           expected:
-            "⚠️ Agent failed before reply: sandbox is not defined.\nLogs: openclaw logs --follow",
+            "⚠️ Request failed — check logs for details.", // TASK-004: Clean one-liner
         },
         {
           error: "Context window exceeded",

@@ -189,7 +189,7 @@ describe("runReplyAgent onAgentRunStart", () => {
 
     expect(onAgentRunStart).not.toHaveBeenCalled();
     expect(result).toMatchObject({
-      text: expect.stringContaining('No API key found for provider "anthropic".'),
+      text: "⚠️ Request failed — check logs for details.", // TASK-004: Clean one-liner
     });
   });
 
