@@ -38,6 +38,12 @@ export function parseDiscordTarget(
   if (userTarget) {
     return userTarget;
   }
+  // Handle guild_id/channel_id format (extract channel_id)
+  const guildChannelMatch = trimmed.match(/^(\d+)\/(\d+)$/);
+  if (guildChannelMatch) {
+    const [, guildId, channelId] = guildChannelMatch;
+    return buildMessagingTarget("channel", channelId, trimmed);
+  }
   if (/^\d+$/.test(trimmed)) {
     if (options.defaultKind) {
       return buildMessagingTarget(options.defaultKind, trimmed, trimmed);
