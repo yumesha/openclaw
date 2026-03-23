@@ -29,6 +29,7 @@ const DEFAULT_PROVIDER_CAPABILITIES: ProviderCapabilities = {
 const PROVIDER_CAPABILITIES: Record<string, Partial<ProviderCapabilities>> = {
   anthropic: {
     providerFamily: "anthropic",
+    dropThinkingBlockModelHints: ["claude"],
   },
   "amazon-bedrock": {
     providerFamily: "anthropic",
