@@ -277,7 +277,17 @@ function resolveGatewayCallContext(opts: CallGatewayBaseOptions): ResolvedGatewa
   const urlOverride = cliUrlOverride ?? envUrlOverride;
   const urlOverrideSource = cliUrlOverride ? "cli" : envUrlOverride ? "env" : undefined;
   const remoteUrl = trimToUndefined(remote?.url);
-  const explicitAuth = resolveExplicitGatewayAuth({ token: opts.token, password: opts.password });
+  // When URL is from environment, also read token from environment for deployment ergonomics.
+  // This allows OPENCLAW_GATEWAY_URL + OPENCLAW_GATEWAY_TOKEN to work together.
+  const envTokenOverride =
+    urlOverrideSource === "env" && !opts.token
+      ? (trimToUndefined(process.env.OPENCLAW_GATEWAY_TOKEN) ??
+        trimToUndefined(process.env.CLAWDBOT_GATEWAY_TOKEN))
+      : undefined;
+  const explicitAuth = resolveExplicitGatewayAuth({
+    token: opts.token ?? envTokenOverride,
+    password: opts.password,
+  });
   return {
     config,
     configPath,
