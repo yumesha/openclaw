@@ -124,6 +124,11 @@ const hoisted = vi.hoisted(() => {
     },
   );
 
+  const authProfileReloaderStop = vi.fn(async () => {});
+  const startAuthProfileReloader = vi.fn(() => {
+    return { stop: authProfileReloaderStop };
+  });
+
   return {
     CronService: CronServiceMock,
     cronInstances,
@@ -137,7 +142,9 @@ const hoisted = vi.hoisted(() => {
     providerManager,
     createChannelManager,
     startGatewayConfigReloader,
+    startAuthProfileReloader,
     reloaderStop,
+    authProfileReloaderStop,
     getOnHotReload: () => onHotReload,
     getOnRestart: () => onRestart,
   };
@@ -166,6 +173,7 @@ vi.mock("./server-channels.js", () => ({
 
 vi.mock("./config-reload.js", () => ({
   startGatewayConfigReloader: hoisted.startGatewayConfigReloader,
+  startAuthProfileReloader: hoisted.startAuthProfileReloader,
 }));
 
 installGatewayTestHooks({ scope: "suite" });

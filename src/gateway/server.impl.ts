@@ -66,7 +66,7 @@ import {
 import { runOnboardingWizard } from "../wizard/onboarding.js";
 import { createAuthRateLimiter, type AuthRateLimiter } from "./auth-rate-limit.js";
 import { startChannelHealthMonitor } from "./channel-health-monitor.js";
-import { startGatewayConfigReloader } from "./config-reload.js";
+import { startAuthProfileReloader, startGatewayConfigReloader } from "./config-reload.js";
 import type { ControlUiRootState } from "./control-ui.js";
 import {
   GATEWAY_EVENT_UPDATE_AVAILABLE,
@@ -946,8 +946,8 @@ export async function startGatewayServer(
     }
   }
 
-  const configReloader = minimalTestGateway
-    ? { stop: async () => {} }
+  const reloaders = minimalTestGateway
+    ? { configReloader: { stop: async () => {} }, authProfileReloader: { stop: async () => {} } }
     : (() => {
         const { applyHotReload, requestGatewayRestart } = createGatewayReloadHandlers({
           deps,
@@ -979,7 +979,7 @@ export async function startGatewayServer(
             startChannelHealthMonitor({ channelManager, checkIntervalMs }),
         });
 
-        return startGatewayConfigReloader({
+        const configReloader = startGatewayConfigReloader({
           initialConfig: cfgAtStart,
           readSnapshot: readConfigFileSnapshot,
           onHotReload: async (plan, nextConfig) => {
@@ -1010,6 +1010,17 @@ export async function startGatewayServer(
           },
           watchPath: CONFIG_PATH,
         });
+
+        // Start auth profile reloader to enable hot-reload of OAuth tokens
+        const authProfileReloader = startAuthProfileReloader({
+          log: {
+            info: (msg) => logReload.info(msg),
+            warn: (msg) => logReload.warn(msg),
+            error: (msg) => logReload.error(msg),
+          },
+        });
+
+        return { configReloader, authProfileReloader };
       })();
 
   const close = createGatewayCloseHandler({
@@ -1032,7 +1043,8 @@ export async function startGatewayServer(
     heartbeatUnsub,
     chatRunState,
     clients,
-    configReloader,
+    configReloader: reloaders.configReloader,
+    authProfileReloader: reloaders.authProfileReloader,
     browserControl,
     wss,
     httpServer,

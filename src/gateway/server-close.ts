@@ -27,6 +27,7 @@ export function createGatewayCloseHandler(params: {
   chatRunState: { clear: () => void };
   clients: Set<{ socket: { close: (code: number, reason: string) => void } }>;
   configReloader: { stop: () => Promise<void> };
+  authProfileReloader?: { stop: () => Promise<void> };
   browserControl: { stop: () => Promise<void> } | null;
   wss: WebSocketServer;
   httpServer: HttpServer;
@@ -115,6 +116,9 @@ export function createGatewayCloseHandler(params: {
     }
     params.clients.clear();
     await params.configReloader.stop().catch(() => {});
+    if (params.authProfileReloader) {
+      await params.authProfileReloader.stop().catch(() => {});
+    }
     if (params.browserControl) {
       await params.browserControl.stop().catch(() => {});
     }

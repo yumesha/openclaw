@@ -69,6 +69,10 @@ export type GatewayConfigReloader = {
   stop: () => Promise<void>;
 };
 
+export type AuthProfileReloader = {
+  stop: () => Promise<void>;
+};
+
 export function startGatewayConfigReloader(opts: {
   initialConfig: OpenClawConfig;
   readSnapshot: () => Promise<ConfigFileSnapshot>;
@@ -230,6 +234,79 @@ export function startGatewayConfigReloader(opts: {
     }
     watcherClosed = true;
     opts.log.warn(`config watcher error: ${String(err)}`);
+    void watcher.close().catch(() => {});
+  });
+
+  return {
+    stop: async () => {
+      stopped = true;
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      debounceTimer = null;
+      watcherClosed = true;
+      await watcher.close().catch(() => {});
+    },
+  };
+}
+
+import { clearRuntimeAuthProfileStoreSnapshots } from "../agents/auth-profiles/store.js";
+import { resolveAuthStorePath } from "../agents/auth-profiles/paths.js";
+
+/**
+ * Start a file watcher for auth-profiles.json that clears the runtime auth cache
+ * when the file changes. This enables hot-reloading of OAuth tokens without
+ * gateway restart.
+ */
+export function startAuthProfileReloader(opts: {
+  agentDir?: string;
+  log: {
+    info: (msg: string) => void;
+    warn: (msg: string) => void;
+    error: (msg: string) => void;
+  };
+}): AuthProfileReloader {
+  const authPath = resolveAuthStorePath(opts.agentDir);
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+
+  const clearCache = () => {
+    if (stopped) {
+      return;
+    }
+    opts.log.info(`auth-profiles.json change detected; clearing auth cache`);
+    clearRuntimeAuthProfileStoreSnapshots();
+  };
+
+  const schedule = () => {
+    if (stopped) {
+      return;
+    }
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null;
+      clearCache();
+    }, 300);
+  };
+
+  const watcher = chokidar.watch(authPath, {
+    ignoreInitial: true,
+    awaitWriteFinish: { stabilityThreshold: 200, pollInterval: 50 },
+    usePolling: Boolean(process.env.VITEST),
+  });
+
+  watcher.on("add", schedule);
+  watcher.on("change", schedule);
+  watcher.on("unlink", schedule);
+  let watcherClosed = false;
+  watcher.on("error", (err) => {
+    if (watcherClosed) {
+      return;
+    }
+    watcherClosed = true;
+    opts.log.warn(`auth profile watcher error: ${String(err)}`);
     void watcher.close().catch(() => {});
   });
 
