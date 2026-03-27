@@ -216,6 +216,10 @@ export function registerInternalHook(eventKey: string, handler: InternalHookHand
     handlers.set(eventKey, []);
   }
   handlers.get(eventKey)!.push(handler);
+  // Debug logging for hook registration (temporary)
+  log.info(
+    `registerInternalHook: registered handler for "${eventKey}" (total handlers for key: ${handlers.get(eventKey)!.length})`,
+  );
 }
 
 /**
@@ -272,6 +276,13 @@ export async function triggerInternalHook(event: InternalHookEvent): Promise<voi
   const specificHandlers = handlers.get(`${event.type}:${event.action}`) ?? [];
 
   const allHandlers = [...typeHandlers, ...specificHandlers];
+
+  // Debug logging for hook trigger (temporary - change back to log.debug after investigation)
+  log.info(
+    `triggerInternalHook: type=${event.type} action=${event.action} ` +
+      `typeHandlers=${typeHandlers.length} specificHandlers=${specificHandlers.length} ` +
+      `registeredKeys=[${Array.from(handlers.keys()).join(", ")}]`,
+  );
 
   if (allHandlers.length === 0) {
     return;
