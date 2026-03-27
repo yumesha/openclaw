@@ -61,6 +61,9 @@ async function clearAllLcmData(agentId: string): Promise<boolean> {
     const { DatabaseSync } = await import("node:sqlite");
     const db = new DatabaseSync(dbPath);
 
+    // Disable foreign key constraints temporarily to allow cascading delete
+    db.exec("PRAGMA foreign_keys = OFF;");
+
     // Count ALL conversations (including legacy data with null session_key)
     const totalCountStmt = db.prepare("SELECT COUNT(*) as count FROM conversations;");
     const totalResult = totalCountStmt.get() as { count: number } | undefined;
@@ -76,16 +79,22 @@ async function clearAllLcmData(agentId: string): Promise<boolean> {
     console.error(`[LCM CLEAR HANDLER] Found ${agentCount} conversations for agent ${agentId}`);
 
     if (totalCount === 0) {
+      db.exec("PRAGMA foreign_keys = ON;");
       db.close();
       return false;
     }
 
-    // Delete ALL conversations (clear entire database for this agent)
-    // This cascades to messages, summaries, etc. via foreign keys
-    const deleteStmt = db.prepare("DELETE FROM conversations;");
-    deleteStmt.run();
+    // Delete ALL data in correct order (child tables first, then parent)
+    // Foreign keys are disabled, but we clear all tables to be safe
+    db.exec("DELETE FROM message_parts;");
+    db.exec("DELETE FROM messages;");
+    db.exec("DELETE FROM summaries;");
+    db.exec("DELETE FROM conversations;");
 
     console.error(`[LCM CLEAR HANDLER] Deleted ${totalCount} conversations from ${dbPath}`);
+
+    // Re-enable foreign keys
+    db.exec("PRAGMA foreign_keys = ON;");
 
     // Try to vacuum to reclaim space
     try {
