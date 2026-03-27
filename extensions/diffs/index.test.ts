@@ -22,7 +22,9 @@ describe("diffs plugin registration", () => {
         error() {},
       },
       registerTool,
-      registerHook() {},
+      registerHook() {
+        return false;
+      },
       registerHttpRoute,
       registerChannel() {},
       registerGatewayMethod() {},
@@ -96,7 +98,9 @@ describe("diffs plugin registration", () => {
       registerTool(tool) {
         registeredTool = typeof tool === "function" ? undefined : tool;
       },
-      registerHook() {},
+      registerHook() {
+        return false;
+      },
       registerHttpRoute(params) {
         registeredHttpRouteHandler = params.handler as typeof registeredHttpRouteHandler;
       },

@@ -223,7 +223,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     handler: Parameters<typeof registerInternalHook>[1],
     opts: OpenClawPluginHookOptions | undefined,
     config: OpenClawPluginApi["config"],
-  ) => {
+  ): boolean => {
     const eventList = Array.isArray(events) ? events : [events];
     const normalizedEvents = eventList.map((event) => event.trim()).filter(Boolean);
     const entry = opts?.entry ?? null;
@@ -235,7 +235,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
         source: record.source,
         message: "hook registration missing name",
       });
-      return;
+      return false;
     }
 
     const description = entry?.hook.description ?? opts?.description ?? "";
@@ -279,12 +279,13 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
 
     const hookSystemEnabled = config?.hooks?.internal?.enabled === true;
     if (!hookSystemEnabled || opts?.register === false) {
-      return;
+      return false;
     }
 
     for (const event of normalizedEvents) {
       registerInternalHook(event, handler);
     }
+    return true;
   };
 
   const registerGatewayMethod = (

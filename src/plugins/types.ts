@@ -278,7 +278,7 @@ export type OpenClawPluginApi = {
     events: string | string[],
     handler: InternalHookHandler,
     opts?: OpenClawPluginHookOptions,
-  ) => void;
+  ) => boolean;
   registerHttpRoute: (params: OpenClawPluginHttpRouteParams) => void;
   registerChannel: (registration: OpenClawPluginChannelRegistration | ChannelPlugin) => void;
   registerGatewayMethod: (method: string, handler: GatewayRequestHandler) => void;

@@ -406,7 +406,9 @@ function createApi(): OpenClawPluginApi {
       error() {},
     },
     registerTool() {},
-    registerHook() {},
+    registerHook() {
+      return false;
+    },
     registerHttpRoute() {},
     registerChannel() {},
     registerGatewayMethod() {},
