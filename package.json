@@ -88,6 +88,10 @@
       "types": "./dist/plugin-sdk/bluebubbles.d.ts",
       "default": "./dist/plugin-sdk/bluebubbles.js"
     },
+    "./hooks/bundled/lcm-clear-on-new/handler.js": {
+      "types": "./dist/bundled/lcm-clear-on-new/handler.d.ts",
+      "default": "./dist/bundled/lcm-clear-on-new/handler.js"
+    },
     "./plugin-sdk/copilot-proxy": {
       "types": "./dist/plugin-sdk/copilot-proxy.d.ts",
       "default": "./dist/plugin-sdk/copilot-proxy.js"
