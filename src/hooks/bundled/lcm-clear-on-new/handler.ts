@@ -150,6 +150,17 @@ const clearLcmOnNew: HookHandler = async (event) => {
     `[LCM CLEAR HANDLER] Agent ID: ${agentId} (from sessionKey: ${agentIdFromSession || "fallback"})`,
   );
 
+  // Check if LCM plugin is registered for this agent
+  const clearFn = globalRegistry.clearFns[agentId];
+  const lcmEnabled = clearFn !== undefined;
+
+  if (!lcmEnabled) {
+    console.error(
+      `[LCM CLEAR HANDLER] LCM plugin not enabled for agent '${agentId}', skipping clear`,
+    );
+    return;
+  }
+
   try {
     // Clear ALL LCM data for this agent (entire database, not just one session)
     console.error(`[LCM CLEAR HANDLER] Clearing ALL LCM data for agent: ${agentId}`);
