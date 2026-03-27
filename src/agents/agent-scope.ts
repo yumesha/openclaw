@@ -39,6 +39,8 @@ type ResolvedAgentConfig = {
   subagents?: AgentEntry["subagents"];
   sandbox?: AgentEntry["sandbox"];
   tools?: AgentEntry["tools"];
+  typingTtlMs?: AgentEntry["typingTtlMs"];
+  typingIntervalSeconds?: AgentEntry["typingIntervalSeconds"];
 };
 
 let defaultAgentWarned = false;
@@ -141,6 +143,9 @@ export function resolveAgentConfig(
     subagents: typeof entry.subagents === "object" && entry.subagents ? entry.subagents : undefined,
     sandbox: entry.sandbox,
     tools: entry.tools,
+    typingTtlMs: typeof entry.typingTtlMs === "number" ? entry.typingTtlMs : undefined,
+    typingIntervalSeconds:
+      typeof entry.typingIntervalSeconds === "number" ? entry.typingIntervalSeconds : undefined,
   };
 }
 

@@ -3,6 +3,7 @@ import {
   resolveAgentWorkspaceDir,
   resolveSessionAgentId,
   resolveAgentSkillsFilter,
+  resolveAgentConfig,
 } from "../../agents/agent-scope.js";
 import { resolveModelRefFromString } from "../../agents/model-selection.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
@@ -110,12 +111,17 @@ export async function getReplyFromConfig(
   const workspaceDir = workspace.dir;
   const agentDir = resolveAgentDir(cfg, agentId);
   const timeoutMs = resolveAgentTimeoutMs({ cfg, overrideSeconds: opts?.timeoutOverrideSeconds });
+  const specificAgentCfg = resolveAgentConfig(cfg, agentId);
   const configuredTypingSeconds =
-    agentCfg?.typingIntervalSeconds ?? sessionCfg?.typingIntervalSeconds;
+    specificAgentCfg?.typingIntervalSeconds ??
+    agentCfg?.typingIntervalSeconds ??
+    sessionCfg?.typingIntervalSeconds;
   const typingIntervalSeconds =
     typeof configuredTypingSeconds === "number" ? configuredTypingSeconds : 6;
   const configuredTypingTtlMs =
-    agentCfg?.typingTtlMs ?? sessionCfg?.typingTtlMs;
+    specificAgentCfg?.typingTtlMs ??
+    agentCfg?.typingTtlMs ??
+    sessionCfg?.typingTtlMs;
   const typingTtlMs =
     typeof configuredTypingTtlMs === "number" ? configuredTypingTtlMs : undefined;
   const typing = createTypingController({

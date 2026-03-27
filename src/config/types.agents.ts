@@ -87,6 +87,10 @@ export type AgentConfig = {
   tools?: AgentToolsConfig;
   /** Optional runtime descriptor for this agent. */
   runtime?: AgentRuntimeConfig;
+  /** Typing indicator TTL in milliseconds. Overrides agents.defaults.typingTtlMs. */
+  typingTtlMs?: number;
+  /** Typing indicator interval in seconds. Overrides agents.defaults.typingIntervalSeconds. */
+  typingIntervalSeconds?: number;
 };
 
 export type AgentsConfig = {

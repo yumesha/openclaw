@@ -747,6 +747,8 @@ export const AgentEntrySchema = z
     sandbox: AgentSandboxSchema,
     tools: AgentToolsSchema,
     runtime: AgentRuntimeSchema,
+    typingTtlMs: z.number().int().positive().optional(),
+    typingIntervalSeconds: z.number().int().positive().optional(),
   })
   .strict();
 
